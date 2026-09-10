@@ -1,9 +1,4 @@
-/**
- * Tipos do banco de dados do Evently.
- *
- * Espelham as migrations em `supabase/migrations/`. Quando o schema mudar,
- * este arquivo muda junto — ele e a fonte de tipos usada pelo cliente Supabase.
- */
+/** Tipos do banco, espelhando as migrations em `supabase/migrations/`. */
 
 /** Ciclo de vida de um convite (UH 05, UH 06 e UH 10). */
 export type StatusConvite =
@@ -63,10 +58,9 @@ export type Convite = {
 /**
  * Contrato que o cliente Supabase usa para tipar queries.
  *
- * Precisa ser um `type`, e nao uma `interface`: o supabase-js exige que o
- * schema seja atribuivel a `Record<string, GenericTable>`, e o TypeScript so
- * concede a index signature implicita necessaria para isso a type aliases.
- * Este e tambem o formato que o `supabase gen types` produz.
+ * Precisa ser `type`, e nao `interface`: o supabase-js exige que o schema seja
+ * atribuivel a `Record<string, GenericTable>`, e so type aliases recebem a
+ * index signature implicita.
  */
 export type Database = {
   public: {
@@ -103,9 +97,8 @@ export type Database = {
         Relationships: [];
       };
     };
-    // Formato gerado pelo `supabase gen types`: um objeto sem chaves.
-    // `Record<string, never>` NAO serve aqui — o supabase-js intersecta
-    // Tables com Views, e uma index signature ampla zera os tipos das tabelas.
+    // Objeto sem chaves. `Record<string, never>` nao serve: o supabase-js
+    // intersecta Tables com Views, e a index signature zera os tipos.
     Views: { [_ in never]: never };
     Functions: { [_ in never]: never };
     Enums: { [_ in never]: never };
