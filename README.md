@@ -151,9 +151,19 @@ Cadastra um organizador (UH 01 — T2).
   "email": "giovane@exemplo.com",
   "cpf": "52998224725",
   "telefone": "11987654321",
-  "senha": "umaSenha123"
+  "senha": "Evently@2026"
 }
 ```
+
+Regras aplicadas (as mesmas na tela e no servidor):
+
+| Campo | Regra |
+|---|---|
+| `nome` | nome e sobrenome, até 50 caracteres, apenas letras |
+| `email` | formato válido, até 254 caracteres (RFC 5321) |
+| `cpf` | 11 dígitos, conferidos pelos dígitos verificadores |
+| `telefone` | DDD válido + 8 ou 9 dígitos |
+| `senha` | 8 caracteres ou mais, com maiúscula, minúscula, número e símbolo |
 
 | Status | Situação |
 |---|---|

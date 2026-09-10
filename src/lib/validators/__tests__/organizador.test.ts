@@ -11,7 +11,7 @@ const VALIDO = {
   email: "  GIOVANE@EXEMPLO.COM ",
   cpf: "529.982.247-25",
   telefone: "(11) 98765-4321",
-  senha: "evently2026",
+  senha: "Evently@2026",
 };
 
 describe("schemaCadastroOrganizador - cenario 1 (dados corretos)", () => {
@@ -24,7 +24,7 @@ describe("schemaCadastroOrganizador - cenario 1 (dados corretos)", () => {
       email: "giovane@exemplo.com",
       cpf: "52998224725",
       telefone: "11987654321",
-      senha: "evently2026",
+      senha: "Evently@2026",
     });
   });
 });
@@ -60,7 +60,7 @@ describe("schemaCadastroOrganizador - cenario 2 (dados invalidos)", () => {
     assert.match(extrairErrosPorCampo(resultado.error!).cpf!, /CPF invalido/);
   });
 
-  it("rejeita senha sem numeros", () => {
+  it("rejeita senha fraca e diz qual requisito falta", () => {
     const resultado = schemaCadastroOrganizador.safeParse({
       ...VALIDO,
       senha: "apenasletras",
@@ -69,8 +69,41 @@ describe("schemaCadastroOrganizador - cenario 2 (dados invalidos)", () => {
     assert.equal(resultado.success, false);
     assert.match(
       extrairErrosPorCampo(resultado.error!).senha!,
-      /letras e numeros/,
+      /A senha precisa de:/,
     );
+  });
+
+  it("rejeita nome sem sobrenome", () => {
+    const resultado = schemaCadastroOrganizador.safeParse({
+      ...VALIDO,
+      nome: "Giovane",
+    });
+
+    assert.equal(resultado.success, false);
+    assert.match(
+      extrairErrosPorCampo(resultado.error!).nome!,
+      /nome e sobrenome/i,
+    );
+  });
+
+  it("rejeita nome acima de 50 caracteres", () => {
+    const resultado = schemaCadastroOrganizador.safeParse({
+      ...VALIDO,
+      nome: `${"Giovane".repeat(7)} Oba`,
+    });
+
+    assert.equal(resultado.success, false);
+    assert.match(extrairErrosPorCampo(resultado.error!).nome!, /50 caracteres/);
+  });
+
+  it("rejeita e-mail acima de 254 caracteres", () => {
+    const resultado = schemaCadastroOrganizador.safeParse({
+      ...VALIDO,
+      email: `${"a".repeat(250)}@exemplo.com`,
+    });
+
+    assert.equal(resultado.success, false);
+    assert.match(extrairErrosPorCampo(resultado.error!).email!, /254/);
   });
 
   it("guarda apenas a primeira mensagem de cada campo", () => {

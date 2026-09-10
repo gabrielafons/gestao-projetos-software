@@ -2,9 +2,21 @@ import { z } from "zod";
 
 import { cpfEhValido, normalizarCpf } from "@/lib/validators/cpf";
 import {
+  normalizarNome,
+  nomeCompletoEhValido,
+  TAMANHO_MAXIMO_NOME,
+} from "@/lib/validators/nome";
+import {
+  REQUISITOS_SENHA,
+  TAMANHO_MAXIMO_SENHA,
+} from "@/lib/validators/senha";
+import {
   normalizarTelefone,
   telefoneEhValido,
 } from "@/lib/validators/telefone";
+
+/** Limite de um endereco de e-mail pela RFC 5321. */
+export const TAMANHO_MAXIMO_EMAIL = 254;
 
 /**
  * UH 01 - T3 - Validador dos dados obrigatorios do cadastro de organizador.
@@ -15,15 +27,23 @@ import {
 export const schemaCadastroOrganizador = z.object({
   nome: z
     .string()
-    .trim()
-    .min(3, "Informe o nome completo (ao menos 3 caracteres).")
-    .max(120, "O nome deve ter no maximo 120 caracteres."),
+    .min(1, "Informe o nome completo.")
+    .transform(normalizarNome)
+    .refine(
+      (nome) => nome.length <= TAMANHO_MAXIMO_NOME,
+      `O nome deve ter no maximo ${TAMANHO_MAXIMO_NOME} caracteres.`,
+    )
+    .refine(nomeCompletoEhValido, "Informe nome e sobrenome."),
 
   email: z
     .string()
     .trim()
     .toLowerCase()
     .min(1, "Informe o e-mail.")
+    .max(
+      TAMANHO_MAXIMO_EMAIL,
+      `O e-mail deve ter no maximo ${TAMANHO_MAXIMO_EMAIL} caracteres.`,
+    )
     .pipe(z.email("Informe um e-mail valido.")),
 
   cpf: z
@@ -40,12 +60,23 @@ export const schemaCadastroOrganizador = z.object({
 
   senha: z
     .string()
-    .min(8, "A senha deve ter ao menos 8 caracteres.")
-    .max(72, "A senha deve ter no maximo 72 caracteres.")
-    .refine(
-      (senha) => /[A-Za-z]/.test(senha) && /[0-9]/.test(senha),
-      "A senha deve combinar letras e numeros.",
-    ),
+    .min(1, "Informe a senha.")
+    .max(
+      TAMANHO_MAXIMO_SENHA,
+      `A senha deve ter no maximo ${TAMANHO_MAXIMO_SENHA} caracteres.`,
+    )
+    .superRefine((senha, ctx) => {
+      // Um problema por requisito nao atendido, para a tela conseguir dizer
+      // exatamente o que falta em vez de "senha fraca".
+      for (const requisito of REQUISITOS_SENHA) {
+        if (!requisito.atende(senha)) {
+          ctx.addIssue({
+            code: "custom",
+            message: `A senha precisa de: ${requisito.texto.toLowerCase()}.`,
+          });
+        }
+      }
+    }),
 });
 
 /** Dados ja validados e normalizados, prontos para ir ao banco. */
@@ -80,4 +111,18 @@ export function extrairErrosPorCampo(erro: z.ZodError): ErrosPorCampo {
   }
 
   return erros;
+}
+
+/**
+ * Valida um campo isoladamente, para o formulario dar retorno enquanto a
+ * pessoa preenche — sem esperar o envio.
+ *
+ * Retorna a primeira mensagem pendente, ou `undefined` se o campo esta valido.
+ */
+export function validarCampo(
+  campo: keyof EntradaCadastroOrganizador,
+  valor: string,
+): string | undefined {
+  const resultado = schemaCadastroOrganizador.shape[campo].safeParse(valor);
+  return resultado.success ? undefined : resultado.error.issues[0]?.message;
 }
