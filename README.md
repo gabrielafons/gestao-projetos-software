@@ -98,14 +98,19 @@ em triggers de banco. As responsabilidades são separadas em camadas:
 src/
 ├── app/
 │   ├── api/organizadores/route.ts   endpoint de cadastro (HTTP apenas)
+│   ├── api/sessao/route.ts          login e logout
 │   ├── cadastro/organizador/        formulário de cadastro
+│   ├── login/                       tela de login
+│   ├── painel/                      área do organizador (exige sessão)
 │   └── page.tsx                     home
 ├── components/                      componentes de UI reutilizáveis
 ├── lib/
 │   ├── env.ts                       leitura validada das variáveis de ambiente
+│   ├── perfis.ts                    perfis de acesso e rota inicial de cada um
 │   ├── services/                    regra de negócio (não conhece HTTP)
 │   ├── supabase/                    clientes: navegador, servidor e admin
 │   └── validators/                  schemas de validação + testes
+├── middleware.ts                    renova a sessão e protege as rotas
 └── types/database.ts                tipos que espelham o schema
 
 supabase/migrations/                 schema versionado, uma migration por tarefa
@@ -171,3 +176,40 @@ Regras aplicadas (as mesmas na tela e no servidor):
 | `400` | dados obrigatórios ausentes ou inválidos (retorna `erros` por campo) |
 | `409` | e-mail ou CPF já cadastrado |
 | `500` | falha inesperada |
+
+### `POST /api/sessao`
+
+Abre a sessão (UH 04 — T2/T5). Retorna o perfil e a rota inicial dele.
+
+```json
+{ "email": "giovane@exemplo.com", "senha": "Evently@2026" }
+```
+
+| Status | Situação |
+|---|---|
+| `200` | sessão aberta |
+| `400` | e-mail ou senha não informados |
+| `401` | e-mail ou senha incorretos |
+| `403` | conta sem perfil definido |
+
+### `DELETE /api/sessao`
+
+Encerra a sessão. Responde `204`.
+
+---
+
+# Controle de acesso
+
+O perfil (`organizador`, `convidado` ou `operador`) é gravado nos metadados do
+usuário no Supabase Auth durante o cadastro, e decide o que cada pessoa alcança:
+
+| Perfil | Destino ao entrar |
+|---|---|
+| organizador | `/painel` |
+| convidado | `/meus-convites` |
+| operador | `/operacao` |
+
+A proteção acontece em duas camadas: o `middleware.ts` barra quem não tem
+sessão antes da página carregar, e cada página protegida confere o perfil —
+para que um convidado autenticado não alcance a área do organizador apenas
+digitando a URL.
