@@ -35,12 +35,18 @@ export default function Home() {
           material preparatorio liberado para quem confirma.
         </p>
 
-        <div className="mt-8">
+        <div className="mt-8 flex flex-wrap items-center gap-4">
           <Link
             href="/cadastro/organizador"
             className="inline-block rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-500"
           >
             Criar conta de organizador
+          </Link>
+          <Link
+            href="/login"
+            className="text-sm font-medium text-neutral-700 hover:underline dark:text-neutral-300"
+          >
+            Ja tenho conta
           </Link>
         </div>
 

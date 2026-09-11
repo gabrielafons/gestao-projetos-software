@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { CampoFormulario } from "@/components/campo-formulario";
 import { RequisitosSenha } from "@/components/requisitos-senha";
@@ -36,6 +37,7 @@ type Campos = typeof VALORES_INICIAIS;
 type NomeCampo = keyof Campos;
 
 export default function PaginaCadastroOrganizador() {
+  const router = useRouter();
   const [campos, setCampos] = useState<Campos>(VALORES_INICIAIS);
   const [erros, setErros] = useState<ErrosPorCampo>({});
   const [tocados, setTocados] = useState<Partial<Record<NomeCampo, boolean>>>({});
@@ -110,6 +112,25 @@ export default function PaginaCadastroOrganizador() {
       }
 
       // Cenario 1: conta criada, acesso liberado.
+      // UH 01 - T5: a sessao e aberta na sequencia, para a pessoa nao ter de
+      // digitar de novo o que acabou de cadastrar.
+      const sessao = await fetch("/api/sessao", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: validacao.data.email,
+          senha: validacao.data.senha,
+        }),
+      });
+
+      if (sessao.ok) {
+        const { destino } = await sessao.json();
+        router.replace(destino);
+        router.refresh();
+        return;
+      }
+
+      // A conta existe; so a sessao automatica falhou. Sobra entrar a mao.
       setConcluido(true);
     } catch {
       setErroGeral(
@@ -131,14 +152,14 @@ export default function PaginaCadastroOrganizador() {
           </div>
           <h1 className="text-xl font-semibold">Cadastro realizado</h1>
           <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
-            Sua conta de organizador foi criada. Voce ja pode acessar a
-            plataforma e cadastrar seu primeiro evento.
+            Sua conta de organizador foi criada. Entre para cadastrar seu
+            primeiro evento.
           </p>
           <Link
-            href="/"
+            href="/login"
             className="mt-6 inline-block rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
           >
-            Voltar ao inicio
+            Entrar
           </Link>
         </div>
       </main>
