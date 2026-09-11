@@ -9,12 +9,7 @@ interface CampoFormularioProps extends InputHTMLAttributes<HTMLInputElement> {
   ajuda?: string;
 }
 
-/**
- * Campo de formulario com rotulo, estado de erro e acessibilidade.
- *
- * Concentrar isso em um componente evita repetir — e divergir — a marcacao de
- * erro a cada formulario novo (cadastro de evento, de convidado, login...).
- */
+/** Campo de formulario com rotulo, estado de erro e acessibilidade. */
 export function CampoFormulario({
   id,
   rotulo,

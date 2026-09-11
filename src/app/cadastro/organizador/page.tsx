@@ -15,9 +15,8 @@ import {
 /**
  * UH 01 - T4 - Formulario de cadastro de organizador com validacao na UI.
  *
- * A validacao daqui usa o MESMO schema do endpoint (`schemaCadastroOrganizador`),
- * entao a mensagem na tela e a regra do servidor nunca divergem. Isso e
- * conveniencia para o usuario: o servidor valida de novo, sempre.
+ * Usa o mesmo schema do endpoint. A validacao daqui e conveniencia: o
+ * servidor valida de novo, sempre.
  */
 
 const VALORES_INICIAIS = {

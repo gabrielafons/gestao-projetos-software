@@ -1,13 +1,9 @@
 /**
- * Leitura centralizada e validada das variaveis de ambiente.
+ * Leitura validada das variaveis de ambiente.
  *
- * A leitura e preguicosa (dentro de funcoes) de proposito: se fosse avaliada
- * no topo do modulo, o `next build` quebraria em qualquer maquina sem as
- * chaves — inclusive na CI. Assim, a ausencia de uma variavel falha no momento
- * em que ela e de fato necessaria, com uma mensagem que diz o que fazer.
- *
- * As referencias a `process.env.NEXT_PUBLIC_*` sao literais porque o Next
- * substitui esses trechos em tempo de build para expo-las ao navegador.
+ * A leitura fica dentro das funcoes para nao quebrar o build em maquinas sem
+ * as chaves configuradas. As referencias a `process.env.NEXT_PUBLIC_*` sao
+ * literais porque o Next as substitui em tempo de build.
  */
 
 function obrigatoria(nome: string, valor: string | undefined): string {

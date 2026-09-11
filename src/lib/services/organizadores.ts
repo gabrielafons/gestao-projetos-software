@@ -4,14 +4,7 @@ import { criarClienteAdmin } from "@/lib/supabase/admin";
 import type { DadosCadastroOrganizador } from "@/lib/validators/organizador";
 import type { Organizador } from "@/types/database";
 
-/**
- * UH 01 - Regra de negocio do cadastro de organizador.
- *
- * A logica vive aqui, no codigo da aplicacao — nao em Edge Function nem em
- * trigger de banco. O Route Handler apenas traduz HTTP; quem decide o que
- * acontece e este modulo, que pode ser chamado tambem por um script, um teste
- * ou uma Server Action sem passar por HTTP.
- */
+/** UH 01 - Regra de negocio do cadastro de organizador. */
 
 /** Codigos estaveis de falha, para a camada HTTP mapear em status. */
 export type FalhaCadastro =

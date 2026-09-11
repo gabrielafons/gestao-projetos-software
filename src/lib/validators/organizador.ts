@@ -9,12 +9,8 @@ import {
 /**
  * UH 01 - T3 - Validador dos dados obrigatorios do cadastro de organizador.
  *
- * Este schema e o unico lugar onde a regra vive: o formulario (UI) e o endpoint
- * (API) importam daqui. Assim a mensagem que o usuario ve na tela e exatamente
- * a mesma que o servidor aplicaria — a validacao do cliente e conveniencia, a
- * do servidor e a que vale.
- *
- * Campos definidos no card UH 01 - T4: nome, e-mail, telefone, senha, CPF.
+ * Importado pelo formulario e pelo endpoint, para que a mensagem exibida na
+ * tela seja a mesma regra aplicada no servidor.
  */
 export const schemaCadastroOrganizador = z.object({
   nome: z

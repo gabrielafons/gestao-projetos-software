@@ -13,10 +13,6 @@ import {
  * UH 01 - T2 - Endpoint de cadastro de organizador.
  *
  * POST /api/organizadores
- *
- * Esta camada so cuida de HTTP: le o corpo, valida o formato, delega a regra
- * de negocio para o servico e traduz o resultado em status. Nenhuma decisao de
- * dominio acontece aqui.
  */
 
 /** Cada falha do dominio tem um status HTTP correspondente. */
