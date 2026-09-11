@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { CampoFormulario } from "@/components/campo-formulario";
+import { destinoSeguro } from "@/lib/navegacao";
 import {
   extrairErrosLogin,
   schemaLogin,
@@ -51,9 +52,9 @@ function FormularioLogin() {
       }
 
       // Volta para a pagina que a pessoa tentou abrir antes do login, quando
-      // houver; caso contrario, para a area do proprio perfil.
-      const continuar = parametros.get("continuar");
-      router.replace(continuar || corpo.destino);
+      // houver; caso contrario, para a area do proprio perfil. O destino passa
+      // por `destinoSeguro` porque vem da URL e pode apontar para fora do site.
+      router.replace(destinoSeguro(parametros.get("continuar"), corpo.destino));
       router.refresh();
     } catch {
       setErroGeral(
