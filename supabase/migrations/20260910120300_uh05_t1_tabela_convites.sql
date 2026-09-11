@@ -22,10 +22,12 @@ create table if not exists public.convites (
   criado_em timestamptz not null default now(),
   updated_at timestamptz not null default now(),
 
-  constraint convites_nome_nao_vazio
-    check (length(btrim(nome_convidado)) >= 3),
+  constraint convites_nome_convidado_completo
+    check (btrim(nome_convidado) ~ '^[^[:space:]]+([[:space:]]+[^[:space:]]+)+$'
+           and length(btrim(nome_convidado)) between 5 and 50),
   constraint convites_email_formato
-    check (email ~* '^[^@[:space:]]+@[^@[:space:]]+\.[a-z]{2,}$'),
+    check (email ~* '^[^@[:space:]]+@[^@[:space:]]+\.[a-z]{2,}$'
+           and length(email) <= 254),
   -- Ciclo de vida do convite (UH 05, UH 06 e UH 10).
   constraint convites_status_valido
     check (status in ('pendente', 'confirmado', 'recusado', 'cancelado', 'transferido'))

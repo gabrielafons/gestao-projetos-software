@@ -4,11 +4,16 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 
 import { CampoFormulario } from "@/components/campo-formulario";
+import { RequisitosSenha } from "@/components/requisitos-senha";
 import { formatarCpf } from "@/lib/validators/cpf";
+import { TAMANHO_MAXIMO_NOME } from "@/lib/validators/nome";
+import { TAMANHO_MAXIMO_SENHA } from "@/lib/validators/senha";
 import { formatarTelefone } from "@/lib/validators/telefone";
 import {
   extrairErrosPorCampo,
   schemaCadastroOrganizador,
+  TAMANHO_MAXIMO_EMAIL,
+  validarCampo,
   type ErrosPorCampo,
 } from "@/lib/validators/organizador";
 
@@ -28,18 +33,43 @@ const VALORES_INICIAIS = {
 };
 
 type Campos = typeof VALORES_INICIAIS;
+type NomeCampo = keyof Campos;
 
 export default function PaginaCadastroOrganizador() {
   const [campos, setCampos] = useState<Campos>(VALORES_INICIAIS);
   const [erros, setErros] = useState<ErrosPorCampo>({});
+  const [tocados, setTocados] = useState<Partial<Record<NomeCampo, boolean>>>({});
   const [erroGeral, setErroGeral] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [concluido, setConcluido] = useState(false);
 
-  function atualizar(campo: keyof Campos, valor: string) {
+  /** Um campo so e dado por valido depois que a pessoa passou por ele. */
+  function ehValido(campo: NomeCampo) {
+    return (
+      Boolean(campos[campo]) &&
+      !erros[campo] &&
+      validarCampo(campo, campos[campo]) === undefined
+    );
+  }
+
+  function atualizar(campo: NomeCampo, valor: string) {
     setCampos((atual) => ({ ...atual, [campo]: valor }));
-    // Limpa o erro assim que a pessoa comeca a corrigir o campo.
+
+    // Erro some assim que a pessoa corrige; so reaparece ao sair do campo.
     setErros((atual) => ({ ...atual, [campo]: undefined }));
+  }
+
+  function aoSairDoCampo(campo: NomeCampo) {
+    setTocados((atual) => ({ ...atual, [campo]: true }));
+
+    // A senha tem a propria lista de requisitos logo abaixo: repetir a
+    // pendencia como mensagem de erro seria dizer a mesma coisa duas vezes.
+    if (campo === "senha") return;
+
+    const valor = campos[campo];
+    if (!valor) return;
+
+    setErros((atual) => ({ ...atual, [campo]: validarCampo(campo, valor) }));
   }
 
   async function aoEnviar(evento: FormEvent<HTMLFormElement>) {
@@ -51,6 +81,13 @@ export default function PaginaCadastroOrganizador() {
 
     if (!validacao.success) {
       setErros(extrairErrosPorCampo(validacao.error));
+      setTocados({
+        nome: true,
+        email: true,
+        cpf: true,
+        telefone: true,
+        senha: true,
+      });
       return;
     }
 
@@ -129,9 +166,13 @@ export default function PaginaCadastroOrganizador() {
             rotulo="Nome completo"
             autoComplete="name"
             required
+            maxLength={TAMANHO_MAXIMO_NOME}
+            placeholder="Nome e sobrenome"
             value={campos.nome}
-            erro={erros.nome}
+            erro={tocados.nome ? erros.nome : undefined}
+            valido={ehValido("nome")}
             onChange={(e) => atualizar("nome", e.target.value)}
+            onBlur={() => aoSairDoCampo("nome")}
           />
 
           <CampoFormulario
@@ -141,9 +182,12 @@ export default function PaginaCadastroOrganizador() {
             inputMode="email"
             autoComplete="email"
             required
+            maxLength={TAMANHO_MAXIMO_EMAIL}
             value={campos.email}
-            erro={erros.email}
+            erro={tocados.email ? erros.email : undefined}
+            valido={ehValido("email")}
             onChange={(e) => atualizar("email", e.target.value)}
+            onBlur={() => aoSairDoCampo("email")}
           />
 
           <CampoFormulario
@@ -154,8 +198,10 @@ export default function PaginaCadastroOrganizador() {
             placeholder="000.000.000-00"
             required
             value={formatarCpf(campos.cpf)}
-            erro={erros.cpf}
+            erro={tocados.cpf ? erros.cpf : undefined}
+            valido={ehValido("cpf")}
             onChange={(e) => atualizar("cpf", e.target.value)}
+            onBlur={() => aoSairDoCampo("cpf")}
           />
 
           <CampoFormulario
@@ -167,21 +213,29 @@ export default function PaginaCadastroOrganizador() {
             placeholder="(00) 00000-0000"
             required
             value={formatarTelefone(campos.telefone)}
-            erro={erros.telefone}
+            erro={tocados.telefone ? erros.telefone : undefined}
+            valido={ehValido("telefone")}
             onChange={(e) => atualizar("telefone", e.target.value)}
+            onBlur={() => aoSairDoCampo("telefone")}
           />
 
-          <CampoFormulario
-            id="senha"
-            rotulo="Senha"
-            type="password"
-            autoComplete="new-password"
-            required
-            value={campos.senha}
-            erro={erros.senha}
-            ajuda="Ao menos 8 caracteres, combinando letras e numeros."
-            onChange={(e) => atualizar("senha", e.target.value)}
-          />
+          <div>
+            <CampoFormulario
+              id="senha"
+              rotulo="Senha"
+              type="password"
+              autoComplete="new-password"
+              required
+              maxLength={TAMANHO_MAXIMO_SENHA}
+              aria-describedby="senha-requisitos"
+              value={campos.senha}
+              erro={tocados.senha ? erros.senha : undefined}
+              valido={ehValido("senha")}
+              onChange={(e) => atualizar("senha", e.target.value)}
+              onBlur={() => aoSairDoCampo("senha")}
+            />
+            <RequisitosSenha id="senha-requisitos" senha={campos.senha} />
+          </div>
 
           {erroGeral && (
             <p

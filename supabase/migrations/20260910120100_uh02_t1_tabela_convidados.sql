@@ -15,14 +15,18 @@ create table if not exists public.convidados (
   criado_em timestamptz not null default now(),
   updated_at timestamptz not null default now(),
 
-  constraint convidados_nome_nao_vazio
-    check (length(btrim(nome)) >= 3),
+  -- Nome completo: ao menos dois nomes, no maximo 50 caracteres.
+  constraint convidados_nome_completo
+    check (btrim(nome) ~ '^[^[:space:]]+([[:space:]]+[^[:space:]]+)+$'
+           and length(btrim(nome)) between 5 and 50),
   constraint convidados_cpf_formato
     check (cpf ~ '^[0-9]{11}$'),
   constraint convidados_telefone_formato
     check (telefone ~ '^[0-9]{10,11}$'),
+  -- 254 caracteres e o limite de um endereco de e-mail pela RFC 5321.
   constraint convidados_email_formato
-    check (email ~* '^[^@[:space:]]+@[^@[:space:]]+\.[a-z]{2,}$')
+    check (email ~* '^[^@[:space:]]+@[^@[:space:]]+\.[a-z]{2,}$'
+           and length(email) <= 254)
 );
 
 comment on table public.convidados is
