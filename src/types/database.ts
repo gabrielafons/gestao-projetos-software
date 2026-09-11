@@ -1,15 +1,7 @@
-/** Tipos do banco, espelhando as migrations em `supabase/migrations/`. */
-
-/** Ciclo de vida de um convite (UH 05, UH 06 e UH 10). */
 export type StatusConvite =
-  | "pendente"
-  | "confirmado"
-  | "recusado"
-  | "cancelado"
-  | "transferido";
-
+  "pendente" | "confirmado" | "recusado" | "cancelado" | "transferido";
+export type EstadoEnvio = "pendente" | "processando" | "enviado" | "falhou";
 export type Organizador = {
-  /** Mesmo id do usuario em `auth.users`. */
   id: string;
   nome: string;
   cpf: string;
@@ -18,30 +10,17 @@ export type Organizador = {
   criado_em: string;
   updated_at: string;
 };
-
-export type Convidado = {
-  id: string;
-  nome: string;
-  cpf: string;
-  email: string;
-  telefone: string;
-  criado_em: string;
-  updated_at: string;
-};
-
+export type Convidado = Organizador;
 export type Evento = {
   id: number;
   nome: string;
-  /** Formato ISO `YYYY-MM-DD`. */
   data: string;
-  /** Formato `HH:MM:SS`. */
   horario: string;
   local: string;
   organizador_id: string;
   criado_em: string;
   updated_at: string;
 };
-
 export type Convite = {
   id: number;
   evento_id: number;
@@ -51,56 +30,140 @@ export type Convite = {
   codigo: string;
   convidado_id: string | null;
   expira_em: string | null;
+  cpf: string | null;
+  telefone: string | null;
+  token_hash: string | null;
   criado_em: string;
   updated_at: string;
 };
-
-/**
- * Contrato que o cliente Supabase usa para tipar queries.
- *
- * Precisa ser `type`, e nao `interface`: o supabase-js exige que o schema seja
- * atribuivel a `Record<string, GenericTable>`, e so type aliases recebem a
- * index signature implicita.
- */
+export type ConviteLista = Omit<Convite, "token_hash" | "cpf" | "telefone"> & {
+  envio_status: EstadoEnvio | null;
+  convite_envio_status: EstadoEnvio | null;
+  confirmacao_envio_status: EstadoEnvio | null;
+};
+export type ConviteComEvento = ConviteLista & { evento: Evento };
+export type ConvitePublico = {
+  id: number;
+  nome_evento: string;
+  data: string;
+  horario: string;
+  local: string;
+  expira_em: string;
+  email_mascarado: string;
+};
+export type ConviteCadastro = ConvitePublico & {
+  nome_convidado: string;
+  email: string;
+  cpf: string;
+  telefone: string;
+};
+export type Notificacao = {
+  id: number;
+  convite_id: number;
+  tipo: "convite" | "confirmacao" | "acesso";
+  chave: string;
+  destinatario: string;
+  payload: Record<string, string>;
+  estado: EstadoEnvio;
+  tentativas: number;
+  lease: string | null;
+  lease_ate: string | null;
+  proxima_tentativa: string;
+  provedor_id: string | null;
+  ultimo_erro: string | null;
+  criado_em: string;
+  updated_at: string;
+};
+type Table<Row, Insert = Partial<Row>, Update = Partial<Row>> = {
+  Row: Row;
+  Insert: Insert;
+  Update: Update;
+  Relationships: [];
+};
+type Rpc<Args, Returns> = { Args: Args; Returns: Returns };
 export type Database = {
   public: {
     Tables: {
-      organizadores: {
-        Row: Organizador;
-        Insert: Omit<Organizador, "criado_em" | "updated_at">;
-        Update: Partial<Omit<Organizador, "id">>;
-        Relationships: [];
-      };
-      convidados: {
-        Row: Convidado;
-        Insert: Omit<Convidado, "criado_em" | "updated_at">;
-        Update: Partial<Omit<Convidado, "id">>;
-        Relationships: [];
-      };
-      eventos: {
-        Row: Evento;
-        Insert: Omit<Evento, "id" | "criado_em" | "updated_at">;
-        Update: Partial<Omit<Evento, "id" | "organizador_id">>;
-        Relationships: [];
-      };
-      convites: {
-        Row: Convite;
-        Insert: Omit<
-          Convite,
-          "id" | "criado_em" | "updated_at" | "status" | "convidado_id" | "expira_em"
-        > & {
-          status?: StatusConvite;
-          convidado_id?: string | null;
-          expira_em?: string | null;
-        };
-        Update: Partial<Omit<Convite, "id" | "evento_id">>;
-        Relationships: [];
-      };
+      organizadores: Table<
+        Organizador,
+        Omit<Organizador, "criado_em" | "updated_at">
+      >;
+      convidados: Table<Convidado, Omit<Convidado, "criado_em" | "updated_at">>;
+      eventos: Table<Evento, Omit<Evento, "id" | "criado_em" | "updated_at">>;
+      convites: Table<Convite>;
+      notificacoes: Table<Notificacao>;
     };
-    // Objeto sem chaves. `Record<string, never>` nao serve: o supabase-js
-    // intersecta Tables com Views, e a index signature zera os tipos.
     Views: { [_ in never]: never };
-    Functions: { [_ in never]: never };
+    Functions: {
+      emitir_convite: Rpc<
+        {
+          p_organizador: string;
+          p_evento: number;
+          p_nome: string;
+          p_email: string;
+          p_cpf: string;
+          p_telefone: string;
+          p_codigo: string;
+          p_token_hash: string;
+          p_token: string;
+        },
+        Convite
+      >;
+      cadastrar_convidado: Rpc<
+        {
+          p_usuario: string;
+          p_sessao: string;
+          p_token_hash: string;
+          p_nome: string;
+          p_cpf: string;
+          p_telefone: string;
+        },
+        Convidado
+      >;
+      responder_convite: Rpc<
+        {
+          p_usuario: string;
+          p_sessao: string;
+          p_convite: number;
+          p_status: string;
+        },
+        Convite
+      >;
+      registrar_prova_postal_com_continuidade: Rpc<
+        {
+          p_usuario: string;
+          p_sessao: string;
+          p_convite: number;
+          p_sessao_anterior?: string | null;
+        },
+        undefined
+      >;
+      registrar_prova_postal: Rpc<
+        { p_usuario: string; p_sessao: string; p_convite: number },
+        undefined
+      >;
+      verificar_prova_postal: Rpc<
+        { p_usuario: string; p_sessao: string; p_convite: number },
+        boolean
+      >;
+      recuperar_notificacao: Rpc<
+        {
+          p_usuario: string;
+          p_sessao: string;
+          p_convite: number;
+          p_tipo: "convite" | "confirmacao";
+        },
+        undefined
+      >;
+      consumir_limite: Rpc<
+        { p_chave: string; p_limite: number; p_segundos: number },
+        boolean
+      >;
+      claim_notificacoes: Rpc<
+        { p_limite: number; p_convite?: number },
+        Notificacao[]
+      >;
+    };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };
   };
