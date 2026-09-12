@@ -1,3 +1,5 @@
+import { executarHttp } from "@/lib/http";
+import { limitarSolicitacao } from "@/lib/services/limites";
 import { NextResponse } from "next/server";
 
 import {
@@ -22,7 +24,7 @@ const STATUS_POR_FALHA: Record<FalhaCadastro, number> = {
   ERRO_INTERNO: 500,
 };
 
-export async function POST(request: Request) {
+async function postInterno(request: Request) {
   let corpo: unknown;
 
   try {
@@ -70,4 +72,11 @@ export async function POST(request: Request) {
     },
     { status: 201 },
   );
+}
+
+export async function POST(request: Request) {
+  return executarHttp(async () => {
+    await limitarSolicitacao(request, "cadastro-organizador", 20);
+    return postInterno(request);
+  });
 }
