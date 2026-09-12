@@ -1,7 +1,7 @@
 /**
  * UH 04 - T3 - Perfis de acesso.
  *
- * O perfil fica nos metadados do usuario no Supabase Auth, gravado no
+ * O perfil confiável fica nos app_metadata do Supabase Auth, gravado no
  * cadastro, e e o que decide o que cada pessoa alcanca depois de entrar.
  */
 export const PERFIS = ["organizador", "convidado", "operador"] as const;

@@ -7,7 +7,10 @@ const ALTERNATIVA = "/painel";
 
 describe("destinoSeguro", () => {
   it("aceita caminho interno", () => {
-    assert.equal(destinoSeguro("/meus-convites", ALTERNATIVA), "/meus-convites");
+    assert.equal(
+      destinoSeguro("/meus-convites", ALTERNATIVA),
+      "/meus-convites",
+    );
     assert.equal(
       destinoSeguro("/painel/eventos/7", ALTERNATIVA),
       "/painel/eventos/7",
@@ -20,8 +23,14 @@ describe("destinoSeguro", () => {
   });
 
   it("recusa endereco externo", () => {
-    assert.equal(destinoSeguro("https://site-falso.com", ALTERNATIVA), ALTERNATIVA);
-    assert.equal(destinoSeguro("http://site-falso.com", ALTERNATIVA), ALTERNATIVA);
+    assert.equal(
+      destinoSeguro("https://site-falso.com", ALTERNATIVA),
+      ALTERNATIVA,
+    );
+    assert.equal(
+      destinoSeguro("http://site-falso.com", ALTERNATIVA),
+      ALTERNATIVA,
+    );
   });
 
   it("recusa endereco relativo ao protocolo, que sai do site", () => {
@@ -30,7 +39,10 @@ describe("destinoSeguro", () => {
   });
 
   it("recusa esquema executavel", () => {
-    assert.equal(destinoSeguro("javascript:alert(1)", ALTERNATIVA), ALTERNATIVA);
+    assert.equal(
+      destinoSeguro("javascript:alert(1)", ALTERNATIVA),
+      ALTERNATIVA,
+    );
   });
 
   it("recusa caminho relativo, que depende de onde a pessoa esta", () => {

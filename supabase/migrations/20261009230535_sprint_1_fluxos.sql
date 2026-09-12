@@ -62,3 +62,9 @@ create trigger notificacoes_updated_at before update on public.notificacoes for 
 
 create table private.limites(chave text primary key, janela timestamptz not null default now(),tentativas int not null default 1);
 
+-- Existing affiliations are the migration source, never mutable user metadata.
+update auth.users u set raw_app_meta_data=coalesce(raw_app_meta_data,'{}'::jsonb)||jsonb_build_object('perfil','organizador')
+ where exists(select 1 from public.organizadores o where o.id=u.id);
+update auth.users u set raw_app_meta_data=coalesce(raw_app_meta_data,'{}'::jsonb)||jsonb_build_object('perfil','convidado')
+ where exists(select 1 from public.convidados c where c.id=u.id) and not exists(select 1 from public.organizadores o where o.id=u.id);
+
