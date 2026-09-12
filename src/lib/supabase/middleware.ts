@@ -46,15 +46,22 @@ export async function atualizarSessao(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const caminho = request.nextUrl.pathname;
-  const exigeSessao = ROTAS_PROTEGIDAS.some((rota) => caminho.startsWith(rota));
+  const exigeSessao = ROTAS_PROTEGIDAS.some(
+    (rota) => caminho === rota || caminho.startsWith(`${rota}/`),
+  );
 
   if (!user && exigeSessao) {
     const destino = request.nextUrl.clone();
     destino.pathname = "/login";
     // Guarda o caminho pedido para devolver a pessoa a ele depois do login.
     destino.searchParams.set("continuar", caminho);
-    return NextResponse.redirect(destino);
+    const redirecionamento = NextResponse.redirect(destino);
+    for (const cookie of resposta.cookies.getAll())
+      redirecionamento.cookies.set(cookie);
+    redirecionamento.headers.set("Cache-Control", "private, no-store");
+    return redirecionamento;
   }
 
+  resposta.headers.set("Cache-Control", "private, no-store");
   return resposta;
 }
