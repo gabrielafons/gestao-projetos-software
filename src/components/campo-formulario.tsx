@@ -19,6 +19,7 @@ export function CampoFormulario({
   valido = false,
   ajuda,
   className = "",
+  "aria-describedby": descricaoExterna,
   ...props
 }: CampoFormularioProps) {
   const idDescricao = erro ? `${id}-erro` : ajuda ? `${id}-ajuda` : undefined;
@@ -38,7 +39,10 @@ export function CampoFormulario({
         <input
           id={id}
           aria-invalid={erro ? true : undefined}
-          aria-describedby={idDescricao}
+          aria-describedby={
+            [idDescricao, descricaoExterna].filter(Boolean).join(" ") ||
+            undefined
+          }
           className={[
             "w-full rounded-lg border py-2 pl-3 text-sm outline-none transition",
             // Espaco a direita reservado para o check, para o texto nao passar por baixo dele.
