@@ -14,7 +14,8 @@ export function formatarTelefone(valor: string): string {
   const telefone = normalizarTelefone(valor).slice(0, 11);
 
   if (telefone.length <= 2) return telefone;
-  if (telefone.length <= 6) return `(${telefone.slice(0, 2)}) ${telefone.slice(2)}`;
+  if (telefone.length <= 6)
+    return `(${telefone.slice(0, 2)}) ${telefone.slice(2)}`;
 
   const corte = telefone.length === 11 ? 7 : 6;
   return `(${telefone.slice(0, 2)}) ${telefone.slice(2, corte)}-${telefone.slice(corte)}`;
