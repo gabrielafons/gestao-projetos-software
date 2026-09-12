@@ -13,10 +13,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Evently — Gestao de Eventos Corporativos",
+  title: "Evently — Gestão de Eventos Corporativos",
   description:
-    "Plataforma de gestao de eventos corporativos por convite: convites nominais, " +
-    "trilha de preparo, controle de presenca e quiz.",
+    "Plataforma de gestão de eventos corporativos por convite: convites nominais, " +
+    "acesso verificado por e-mail e confirmação de presença.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
