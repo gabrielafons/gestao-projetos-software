@@ -41,8 +41,3 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-# ferramentas locais de IA (nao fazem parte do projeto)
-CLAUDE.md
-AGENTS.md
-.claude/
