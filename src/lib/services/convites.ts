@@ -27,6 +27,62 @@ import { criarToken, hashToken } from "./tokens";
 import { processarNotificacoes, estadoEnvio } from "./notificacoes";
 const CAMPOS =
   "id,evento_id,nome_convidado,email,status,codigo,convidado_id,expira_em,criado_em,updated_at" as const;
+async function convitePorToken(token: string) {
+  if (!tokenValido(token)) return null;
+  const db = criarClienteAdmin();
+  const { data: c, error } = await db
+    .from("convites")
+    .select("*")
+    .eq("token_hash", hashToken(token))
+    .maybeSingle();
+  falhaBanco(error);
+  if (!c || !conviteVigente(c)) return null;
+  const { data: evento, error: err } = await db
+    .from("eventos")
+    .select("*")
+    .eq("id", c.evento_id)
+    .single();
+  falhaBanco(err);
+  return evento ? { c, evento } : null;
+}
+export async function obterConvitePublico(
+  token: string,
+): Promise<ConvitePublico | null> {
+  const registro = await convitePorToken(token);
+  if (!registro) return null;
+  const { c, evento } = registro;
+  return {
+    id: c.id,
+    nome_evento: evento.nome,
+    data: evento.data,
+    horario: evento.horario,
+    local: evento.local,
+    expira_em: c.expira_em!,
+    email_mascarado: mascararEmail(c.email),
+  };
+}
+export async function obterConviteCadastro(
+  token: string,
+): Promise<ConviteCadastro | null> {
+  const user = await exigirUsuario();
+  const registro = await convitePorToken(token);
+  if (
+    !registro ||
+    !user.email_verificado ||
+    user.email.toLowerCase() !== registro.c.email.toLowerCase()
+  )
+    return null;
+  const { c } = registro;
+  if (c.convidado_id && c.convidado_id !== user.id) return null;
+  if (!(await temProva(user, c.id))) return null;
+  return {
+    ...(await obterConvitePublico(token))!,
+    nome_convidado: c.nome_convidado,
+    email: c.email,
+    cpf: c.cpf ?? "",
+    telefone: c.telefone ?? "",
+  };
+}
 function semSegredos(c: Convite) {
   return {
     id: c.id,
