@@ -188,3 +188,87 @@ export function FormularioEvento() {
     </form>
   );
 }
+
+export function BotaoSolicitarAcesso({ token }: { token: string }) {
+  const envio = useEnvio();
+  const [solicitado, setSolicitado] = useState(false);
+  async function solicitar() {
+    const corpo = await envio.enviar("/api/convites/acesso", { token });
+    if (corpo) {
+      setSolicitado(true);
+      envio.setSucesso(
+        corpo.mensagem ??
+          "Solicitação recebida. Confira o e-mail do convite e a pasta de spam para continuar.",
+      );
+    }
+  }
+  return (
+    <div className="space-y-4">
+      {envio.avisos}
+      <button
+        type="button"
+        disabled={envio.enviando || solicitado}
+        onClick={solicitar}
+        className={classeBotao}
+      >
+        {envio.enviando
+          ? "Solicitando acesso…"
+          : solicitado
+            ? "Solicitação recebida"
+            : "Receber link de acesso por e-mail"}
+      </button>
+    </div>
+  );
+}
+
+export function ConfirmarAcesso({
+  tokenHash,
+  convite,
+}: {
+  tokenHash: string | null;
+  convite: string | null;
+}) {
+  const envio = useEnvio();
+  const router = useRouter();
+  const valido = Boolean(
+    tokenHash && convite && /^[a-f0-9]{64}$/i.test(convite),
+  );
+  async function confirmar() {
+    const corpo = await envio.enviar("/api/sessao/convite", {
+      token_hash: tokenHash,
+      convite,
+    });
+    if (corpo?.destino) {
+      router.replace(
+        `/cadastro/convidado?convite=${encodeURIComponent(convite!)}`,
+      );
+      router.refresh();
+    }
+  }
+  if (!valido)
+    return (
+      <Aviso erro>
+        O link de acesso está incompleto. Volte ao convite e solicite um novo
+        link por e-mail.
+      </Aviso>
+    );
+  return (
+    <div className="space-y-5">
+      <p className="text-sm text-neutral-600 dark:text-neutral-400">
+        Clique abaixo para verificar seu e-mail e continuar o cadastro do
+        convite.
+      </p>
+      {envio.avisos}
+      <button
+        type="button"
+        disabled={envio.enviando}
+        onClick={confirmar}
+        className={classeBotao}
+      >
+        {envio.enviando
+          ? "Verificando acesso…"
+          : "Verificar meu e-mail e continuar"}
+      </button>
+    </div>
+  );
+}
