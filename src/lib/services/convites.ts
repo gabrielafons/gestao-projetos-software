@@ -134,3 +134,139 @@ function semSegredos(c: Convite) {
     expira_em: c.expira_em,
   };
 }
+export async function solicitarAcesso(token: string) {
+  const registro = await convitePorToken(token);
+  if (!registro)
+    throw new FalhaOperacao(
+      "CONVITE_INVALIDO",
+      410,
+      "Convite inválido ou expirado.",
+    );
+  const { c, evento } = registro;
+  const admin = criarClienteAdmin();
+  const { data: permitido, error: limite } = await admin.rpc(
+    "consumir_limite",
+    { p_chave: `convite:${hashToken(token)}`, p_limite: 3, p_segundos: 300 },
+  );
+  falhaBanco(limite);
+  if (!permitido)
+    throw new FalhaOperacao(
+      "LIMITE",
+      429,
+      "Aguarde alguns minutos antes de solicitar outro acesso.",
+    );
+  const { data, error } = await admin.auth.admin.generateLink({
+    type: "magiclink",
+    email: c.email,
+  });
+  if (error || !data?.properties?.hashed_token)
+    throw new FalhaOperacao(
+      "AUTH_INDISPONIVEL",
+      503,
+      "Não foi possível enviar o acesso. Tente novamente.",
+    );
+  const { data: notification, error: err } = await admin
+    .from("notificacoes")
+    .insert({
+      convite_id: c.id,
+      tipo: "acesso",
+      chave: `acesso:${randomUUID()}`,
+      destinatario: c.email,
+      payload: {
+        token,
+        token_hash: data.properties.hashed_token,
+        nome: c.nome_convidado,
+        evento: evento.nome,
+        data: evento.data,
+        horario: evento.horario,
+        local: evento.local,
+        gerado_em: String(Date.now()),
+      },
+    })
+    .select("id")
+    .single();
+  falhaBanco(err);
+  await processarNotificacoes(c.id);
+  const { data: n, error: erro } = await admin
+    .from("notificacoes")
+    .select("estado")
+    .eq("id", notification!.id)
+    .single();
+  falhaBanco(erro);
+  if (n?.estado !== "enviado")
+    throw new FalhaOperacao(
+      "EMAIL_INDISPONIVEL",
+      503,
+      "O e-mail de acesso está pendente. Tente novamente em instantes.",
+    );
+}
+export async function confirmarAcesso(token_hash: string, convite: string) {
+  const registro = await convitePorToken(convite);
+  if (!registro)
+    throw new FalhaOperacao(
+      "CONVITE_INVALIDO",
+      410,
+      "Convite inválido ou expirado.",
+    );
+  const db = await criarClienteServidor();
+  // Capture only this browser's verified session before OTP rotates its cookies.
+  // Never discover prior proofs by user id or accept a session id from the request.
+  const { data: anterior, error: erroAnterior } = await db.auth.getUser();
+  if (
+    erroAnterior &&
+    erroAnterior.name !== "AuthSessionMissingError" &&
+    erroAnterior.status !== 401 &&
+    erroAnterior.status !== 403
+  ) {
+    throw new FalhaOperacao(
+      "AUTH_INDISPONIVEL",
+      503,
+      "Não foi possível verificar sua sessão. Tente novamente.",
+    );
+  }
+  const sessaoAnterior =
+    !erroAnterior && anterior.user
+      ? {
+          usuario: anterior.user.id,
+          sessao: await sessaoVerificada(anterior.user.id, undefined, db),
+        }
+      : null;
+  const { data, error } = await db.auth.verifyOtp({
+    type: "email",
+    token_hash,
+  });
+  if (error || !data.user || !data.session)
+    throw new FalhaOperacao(
+      "LINK_INVALIDO",
+      401,
+      "Link de acesso inválido ou expirado. Solicite outro pelo convite.",
+    );
+  if (
+    !data.user.email_confirmed_at ||
+    data.user.email?.toLowerCase() !== registro.c.email.toLowerCase()
+  ) {
+    await db.auth.signOut();
+    throw new FalhaOperacao(
+      "SEM_PERMISSAO",
+      403,
+      "Este acesso não corresponde ao convite.",
+    );
+  }
+  const sessao = await sessaoVerificada(
+    data.user.id,
+    data.session.access_token,
+    db,
+  );
+  const { error: provaError } = await criarClienteAdmin().rpc(
+    "registrar_prova_postal_com_continuidade",
+    {
+      p_usuario: data.user.id,
+      p_sessao: sessao,
+      p_convite: registro.c.id,
+      p_sessao_anterior:
+        sessaoAnterior?.usuario === data.user.id ? sessaoAnterior.sessao : null,
+    },
+  );
+  falhaBanco(provaError);
+  return `/cadastro/convidado?convite=${convite}`;
+}
