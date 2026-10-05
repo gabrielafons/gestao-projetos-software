@@ -68,6 +68,32 @@ update auth.users u set raw_app_meta_data=coalesce(raw_app_meta_data,'{}'::jsonb
 update auth.users u set raw_app_meta_data=coalesce(raw_app_meta_data,'{}'::jsonb)||jsonb_build_object('perfil','convidado')
  where exists(select 1 from public.convidados c where c.id=u.id) and not exists(select 1 from public.organizadores o where o.id=u.id);
 
+create function private.cadastrar_convidado(p_usuario uuid,p_token_hash text,p_nome text,p_cpf text,p_telefone text)
+returns public.convidados language plpgsql security definer set search_path='' as $$
+declare c public.convites; u auth.users; perfil public.convidados;
+begin
+ select * into u from auth.users where id=p_usuario and email_confirmed_at is not null;
+ if not found then raise exception using errcode='P0001',message='IDENTIDADE_NAO_VERIFICADA'; end if;
+ select * into c from public.convites where token_hash=p_token_hash for update;
+ if not found or c.expira_em is null or c.expira_em<=now() or c.status in ('cancelado','transferido') then
+   raise exception using errcode='P0001',message='CONVITE_INVALIDO'; end if;
+ if lower(c.email)<>lower(u.email) or (c.convidado_id is not null and c.convidado_id<>p_usuario) then
+   raise exception using errcode='P0001',message='CONVITE_NAO_PERTENCE'; end if;
+ -- Preserve an existing profile; do not overwrite identity data when accepting another invitation.
+ insert into public.convidados(id,nome,email,cpf,telefone) values(p_usuario,p_nome,lower(u.email),p_cpf,p_telefone)
+ on conflict(id) do nothing;
+ select * into perfil from public.convidados where id=p_usuario;
+ update public.convites set convidado_id=p_usuario where id=c.id;
+ update auth.users set raw_app_meta_data=coalesce(raw_app_meta_data,'{}'::jsonb)||
+  jsonb_build_object('perfil',case when exists(select 1 from public.organizadores where id=p_usuario) then 'organizador' else 'convidado' end)
+ where id=p_usuario;
+ return perfil;
+end $$;
+
+revoke all on function private.cadastrar_convidado(uuid,text,text,text,text) from public,anon,authenticated;
+grant execute on function private.cadastrar_convidado(uuid,text,text,text,text) to service_role;
+create function public.cadastrar_convidado(p_usuario uuid,p_token_hash text,p_nome text,p_cpf text,p_telefone text) returns public.convidados language sql security invoker set search_path='' as $$ select private.cadastrar_convidado(p_usuario,p_token_hash,p_nome,p_cpf,p_telefone); $$;
+
 create function public.consumir_limite(p_chave text,p_limite int,p_segundos int) returns boolean
 language plpgsql security invoker set search_path='' as $$
 declare quantidade int;

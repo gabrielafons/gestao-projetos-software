@@ -36,6 +36,17 @@ async function estadosEnvio(id: number) {
     confirmacao_envio_status,
   };
 }
+async function temProva(
+  user: Awaited<ReturnType<typeof exigirUsuario>>,
+  convite: number,
+) {
+  const { data, error } = await criarClienteAdmin().rpc(
+    "verificar_prova_postal",
+    { p_usuario: user.id, p_sessao: user.sessao_id, p_convite: convite },
+  );
+  falhaBanco(error);
+  return data === true;
+}
 const CAMPOS =
   "id,evento_id,nome_convidado,email,status,codigo,convidado_id,expira_em,criado_em,updated_at" as const;
 export async function listarMeusConvites(): Promise<ConviteComEvento[]> {
@@ -133,6 +144,38 @@ function semSegredos(c: Convite) {
     convidado_id: c.convidado_id,
     expira_em: c.expira_em,
   };
+}
+export async function cadastrarConvidado(dados: DadosConvidado) {
+  const user = await exigirUsuario();
+  const registro = await convitePorToken(dados.token);
+  if (
+    !registro ||
+    !user.email_verificado ||
+    user.email.toLowerCase() !== registro.c.email.toLowerCase() ||
+    dados.email !== user.email.toLowerCase()
+  )
+    throw new FalhaOperacao(
+      "CONVITE_INVALIDO",
+      403,
+      "Este convite não está disponível para sua conta.",
+    );
+  if (!(await temProva(user, registro.c.id)))
+    throw new FalhaOperacao(
+      "IDENTIDADE_NAO_VERIFICADA",
+      403,
+      "Abra o convite e verifique seu acesso pelo link enviado ao e-mail.",
+    );
+  const db = criarClienteAdmin();
+  const { data, error } = await db.rpc("cadastrar_convidado", {
+    p_usuario: user.id,
+    p_sessao: user.sessao_id,
+    p_token_hash: hashToken(dados.token),
+    p_nome: dados.nome,
+    p_cpf: dados.cpf,
+    p_telefone: dados.telefone,
+  });
+  falhaBanco(error);
+  return data;
 }
 export async function solicitarAcesso(token: string) {
   const registro = await convitePorToken(token);
