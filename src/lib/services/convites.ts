@@ -27,6 +27,34 @@ import { criarToken, hashToken } from "./tokens";
 import { processarNotificacoes, estadoEnvio } from "./notificacoes";
 const CAMPOS =
   "id,evento_id,nome_convidado,email,status,codigo,convidado_id,expira_em,criado_em,updated_at" as const;
+export async function listarMeusConvites(): Promise<ConviteComEvento[]> {
+  const user = await exigirUsuario();
+  const db = await criarClienteServidor();
+  const { data, error } = await db
+    .from("convites")
+    .select(CAMPOS)
+    .eq("convidado_id", user.id)
+    .order("id");
+  falhaBanco(error);
+  const ids = [...new Set((data ?? []).map((c) => c.evento_id))];
+  if (!ids.length) return [];
+  const { data: eventos, error: err } = await db
+    .from("eventos")
+    .select("*")
+    .in("id", ids);
+  falhaBanco(err);
+  return Promise.all(
+    (data ?? [])
+      .flatMap((c) => {
+        const evento = eventos?.find((e) => e.id === c.evento_id);
+        return evento ? [{ ...c, evento }] : [];
+      })
+      .map(async (c) => ({ ...c, ...(await estadosEnvio(c.id)) })),
+  );
+}
+export async function obterMeuConvite(id: number) {
+  return (await listarMeusConvites()).find((c) => c.id === id) ?? null;
+}
 async function convitePorToken(token: string) {
   if (!tokenValido(token)) return null;
   const db = criarClienteAdmin();

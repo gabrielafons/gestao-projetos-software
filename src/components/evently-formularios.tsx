@@ -189,6 +189,142 @@ export function FormularioEvento() {
   );
 }
 
+type CamposPessoa = {
+  nome: string;
+  email: string;
+  cpf: string;
+  telefone: string;
+};
+function CamposPessoaFormulario({
+  campos,
+  mudar,
+  erros,
+  prefixo,
+  emailBloqueado = false,
+}: {
+  campos: CamposPessoa;
+  mudar: (campo: keyof CamposPessoa, valor: string) => void;
+  erros: Record<string, string>;
+  prefixo: string;
+  emailBloqueado?: boolean;
+}) {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <CampoFormulario
+        id={`${prefixo}-nome`}
+        rotulo="Nome completo"
+        autoComplete="name"
+        required
+        maxLength={TAMANHO_MAXIMO_NOME}
+        value={campos.nome}
+        erro={erros.nome ?? erros.nome_convidado}
+        onChange={(e) => mudar("nome", e.target.value)}
+      />
+      <CampoFormulario
+        id={`${prefixo}-email`}
+        rotulo="E-mail"
+        type="email"
+        autoComplete="email"
+        required
+        maxLength={TAMANHO_MAXIMO_EMAIL}
+        readOnly={emailBloqueado}
+        ajuda={
+          emailBloqueado
+            ? "Este é o e-mail verificado para o seu convite."
+            : "O convite será enviado para este endereço."
+        }
+        value={campos.email}
+        erro={erros.email}
+        onChange={(e) => mudar("email", e.target.value)}
+      />
+      <CampoFormulario
+        id={`${prefixo}-cpf`}
+        rotulo="CPF"
+        inputMode="numeric"
+        autoComplete="off"
+        required
+        maxLength={14}
+        placeholder="000.000.000-00"
+        value={formatarCpf(campos.cpf)}
+        erro={erros.cpf}
+        onChange={(e) => mudar("cpf", e.target.value)}
+      />
+      <CampoFormulario
+        id={`${prefixo}-telefone`}
+        rotulo="Telefone"
+        type="tel"
+        autoComplete="tel"
+        required
+        maxLength={16}
+        placeholder="(00) 00000-0000"
+        value={formatarTelefone(campos.telefone)}
+        erro={erros.telefone}
+        onChange={(e) => mudar("telefone", e.target.value)}
+      />
+    </div>
+  );
+}
+
+export function FormularioCadastroConvidado({
+  token,
+  iniciais,
+}: {
+  token: string;
+  iniciais: CamposPessoa;
+}) {
+  const router = useRouter();
+  const envio = useEnvio();
+  const [concluido, setConcluido] = useState(false);
+  const [campos, setCampos] = useState(iniciais);
+  async function aoEnviar(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const validacao = schemaCadastroConvidado.safeParse({ ...campos, token });
+    if (!validacao.success) return envio.validar(validacao.error, "cadastro");
+    const corpo = await envio.enviar("/api/convidados", validacao.data);
+    if (corpo) {
+      setConcluido(true);
+      envio.setSucesso("Cadastro concluído. Abrindo seus convites…");
+      router.replace("/meus-convites");
+      router.refresh();
+    }
+  }
+  return (
+    <form
+      onSubmit={aoEnviar}
+      noValidate
+      className="max-w-2xl space-y-5"
+      aria-busy={envio.enviando}
+    >
+      <fieldset disabled={envio.enviando || concluido}>
+        <legend className="sr-only">Seus dados pessoais</legend>
+        <CamposPessoaFormulario
+          prefixo="cadastro"
+          campos={campos}
+          erros={envio.erros}
+          emailBloqueado
+          mudar={(campo, valor) => {
+            if (campo === "email") return;
+            setCampos((atual) => ({ ...atual, [campo]: valor }));
+            envio.setErros((atual) => ({ ...atual, [campo]: "" }));
+          }}
+        />
+      </fieldset>
+      {envio.avisos}
+      <button
+        type="submit"
+        className={classeBotao}
+        disabled={envio.enviando || concluido}
+      >
+        {concluido
+          ? "Cadastro concluído"
+          : envio.enviando
+            ? "Salvando seus dados…"
+            : "Concluir cadastro e ver convites"}
+      </button>
+    </form>
+  );
+}
+
 export function BotaoSolicitarAcesso({ token }: { token: string }) {
   const envio = useEnvio();
   const [solicitado, setSolicitado] = useState(false);
