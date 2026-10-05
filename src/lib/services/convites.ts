@@ -25,6 +25,17 @@ import { obterEvento } from "./eventos";
 import { falhaBanco, FalhaOperacao } from "./erros";
 import { criarToken, hashToken } from "./tokens";
 import { processarNotificacoes, estadoEnvio } from "./notificacoes";
+async function estadosEnvio(id: number) {
+  const [convite_envio_status, confirmacao_envio_status] = await Promise.all([
+    estadoEnvio(id),
+    estadoEnvio(id, "confirmacao"),
+  ]);
+  return {
+    envio_status: convite_envio_status,
+    convite_envio_status,
+    confirmacao_envio_status,
+  };
+}
 const CAMPOS =
   "id,evento_id,nome_convidado,email,status,codigo,convidado_id,expira_em,criado_em,updated_at" as const;
 export async function listarMeusConvites(): Promise<ConviteComEvento[]> {

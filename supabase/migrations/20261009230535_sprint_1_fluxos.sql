@@ -68,3 +68,37 @@ update auth.users u set raw_app_meta_data=coalesce(raw_app_meta_data,'{}'::jsonb
 update auth.users u set raw_app_meta_data=coalesce(raw_app_meta_data,'{}'::jsonb)||jsonb_build_object('perfil','convidado')
  where exists(select 1 from public.convidados c where c.id=u.id) and not exists(select 1 from public.organizadores o where o.id=u.id);
 
+create function public.consumir_limite(p_chave text,p_limite int,p_segundos int) returns boolean
+language plpgsql security invoker set search_path='' as $$
+declare quantidade int;
+begin
+ insert into private.limites(chave) values(p_chave) on conflict(chave) do update
+ set tentativas=case when private.limites.janela<=now()-make_interval(secs=>p_segundos) then 1 else private.limites.tentativas+1 end,
+ janela=case when private.limites.janela<=now()-make_interval(secs=>p_segundos) then now() else private.limites.janela end
+ returning tentativas into quantidade;
+ return quantidade<=p_limite;
+end $$;
+
+create function public.claim_notificacoes(p_limite int,p_convite bigint default null) returns setof public.notificacoes
+language sql security invoker set search_path='' as $$
+ update public.notificacoes n set estado='processando',tentativas=tentativas+1,lease=gen_random_uuid(),lease_ate=now()+interval '5 minutes'
+ where id in(select id from public.notificacoes
+ where (p_convite is null or convite_id=p_convite) and proxima_tentativa<=now()
+ and (estado in ('pendente','falhou') or (estado='processando' and lease_ate<now()))
+ and tentativas<10 order by id for update skip locked limit least(p_limite,50))
+ returning n.*;
+$$;
+
+-- These endpoints are deliberately not browser APIs, even for authenticated users.
+revoke all on function public.emitir_convite(uuid,bigint,text,text,text,text,text,text,text) from public,anon,authenticated;
+revoke all on function public.cadastrar_convidado(uuid,text,text,text,text) from public,anon,authenticated;
+revoke all on function public.responder_convite(uuid,bigint,text) from public,anon,authenticated;
+revoke all on function public.consumir_limite(text,int,int) from public,anon,authenticated;
+revoke all on function public.claim_notificacoes(int,bigint) from public,anon,authenticated;
+grant execute on function public.emitir_convite(uuid,bigint,text,text,text,text,text,text,text) to service_role;
+grant execute on function public.cadastrar_convidado(uuid,text,text,text,text) to service_role;
+grant execute on function public.responder_convite(uuid,bigint,text) to service_role;
+grant execute on function public.consumir_limite(text,int,int) to service_role;
+grant execute on function public.claim_notificacoes(int,bigint) to service_role;
+grant usage on schema private to service_role;
+grant all on private.limites to service_role;
