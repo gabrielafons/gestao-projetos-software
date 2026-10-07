@@ -94,6 +94,26 @@ revoke all on function private.cadastrar_convidado(uuid,text,text,text,text) fro
 grant execute on function private.cadastrar_convidado(uuid,text,text,text,text) to service_role;
 create function public.cadastrar_convidado(p_usuario uuid,p_token_hash text,p_nome text,p_cpf text,p_telefone text) returns public.convidados language sql security invoker set search_path='' as $$ select private.cadastrar_convidado(p_usuario,p_token_hash,p_nome,p_cpf,p_telefone); $$;
 
+create function public.responder_convite(p_usuario uuid,p_convite bigint,p_status text)
+returns public.convites language plpgsql security invoker set search_path='' as $$
+declare c public.convites; e public.eventos;
+begin
+ if p_status not in ('confirmado','recusado') then raise exception using errcode='P0001',message='STATUS_INVALIDO'; end if;
+ select * into c from public.convites where id=p_convite and convidado_id=p_usuario for update;
+ if not found then raise exception using errcode='P0001',message='CONVITE_NAO_ENCONTRADO'; end if;
+ if c.status=p_status then return c; end if;
+ if c.expira_em is null or c.expira_em<=now() then raise exception using errcode='P0001',message='CONVITE_EXPIRADO'; end if;
+ if c.status<>'pendente' then raise exception using errcode='P0001',message='RESPOSTA_JA_REGISTRADA'; end if;
+ update public.convites set status=p_status where id=c.id returning * into c;
+ if p_status='confirmado' then
+  select * into e from public.eventos where id=c.evento_id;
+  insert into public.notificacoes(convite_id,tipo,chave,destinatario,payload)
+   values(c.id,'confirmacao','confirmacao:'||c.id,c.email,jsonb_build_object('nome',c.nome_convidado,'evento',e.nome,'data',e.data,'horario',e.horario,'local',e.local))
+   on conflict(chave) do nothing;
+ end if;
+ return c;
+end $$;
+
 create function public.consumir_limite(p_chave text,p_limite int,p_segundos int) returns boolean
 language plpgsql security invoker set search_path='' as $$
 declare quantidade int;
