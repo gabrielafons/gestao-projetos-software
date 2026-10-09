@@ -68,6 +68,21 @@ update auth.users u set raw_app_meta_data=coalesce(raw_app_meta_data,'{}'::jsonb
 update auth.users u set raw_app_meta_data=coalesce(raw_app_meta_data,'{}'::jsonb)||jsonb_build_object('perfil','convidado')
  where exists(select 1 from public.convidados c where c.id=u.id) and not exists(select 1 from public.organizadores o where o.id=u.id);
 
+create function public.emitir_convite(p_organizador uuid,p_evento bigint,p_nome text,p_email text,p_cpf text,p_telefone text,p_codigo text,p_token_hash text,p_token text)
+returns public.convites language plpgsql security invoker set search_path='' as $$
+declare e public.eventos; c public.convites; expira timestamptz;
+begin
+ select * into e from public.eventos where id=p_evento and organizador_id=p_organizador;
+ if not found then raise exception using errcode='P0001',message='EVENTO_NAO_ENCONTRADO'; end if;
+ expira := (e.data+e.horario) at time zone 'America/Sao_Paulo';
+ if expira<=now() then raise exception using errcode='P0001',message='EVENTO_ENCERRADO'; end if;
+ insert into public.convites(evento_id,nome_convidado,email,cpf,telefone,codigo,token_hash,expira_em)
+ values(p_evento,p_nome,lower(p_email),p_cpf,p_telefone,p_codigo,p_token_hash,expira) returning * into c;
+ insert into public.notificacoes(convite_id,tipo,chave,destinatario,payload)
+ values(c.id,'convite','convite:'||c.id,lower(p_email),jsonb_build_object('token',p_token,'nome',p_nome,'evento',e.nome,'data',e.data,'horario',e.horario,'local',e.local));
+ return c;
+end $$;
+
 create function private.cadastrar_convidado(p_usuario uuid,p_token_hash text,p_nome text,p_cpf text,p_telefone text)
 returns public.convidados language plpgsql security definer set search_path='' as $$
 declare c public.convites; u auth.users; perfil public.convidados;

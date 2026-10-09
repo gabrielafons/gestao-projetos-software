@@ -148,6 +148,34 @@ export async function obterConviteCadastro(
     telefone: c.telefone ?? "",
   };
 }
+export async function emitirConvite(dados: DadosEmissaoConvite) {
+  const user = await exigirOrganizador();
+  const token = criarToken();
+  const db = criarClienteAdmin();
+  const { data, error } = await db.rpc("emitir_convite", {
+    p_organizador: user.id,
+    p_evento: dados.evento_id,
+    p_nome: dados.nome_convidado,
+    p_email: dados.email,
+    p_cpf: dados.cpf,
+    p_telefone: dados.telefone,
+    p_codigo: randomUUID(),
+    p_token_hash: hashToken(token),
+    p_token: token,
+  });
+  falhaBanco(error);
+  if (!data)
+    throw new FalhaOperacao(
+      "ERRO_INTERNO",
+      503,
+      "Não foi possível emitir o convite.",
+    );
+  await processarNotificacoes(data.id);
+  return {
+    convite: semSegredos(data),
+    envio_status: await estadoEnvio(data.id),
+  };
+}
 function semSegredos(c: Convite) {
   return {
     id: c.id,
