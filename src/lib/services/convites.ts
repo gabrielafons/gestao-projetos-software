@@ -192,6 +192,28 @@ export async function cadastrarConvidado(dados: DadosConvidado) {
   falhaBanco(error);
   return data;
 }
+export async function responderConvite(
+  id: number,
+  status: "confirmado" | "recusado",
+) {
+  const user = await exigirUsuario();
+  if (!user.email_verificado)
+    throw new FalhaOperacao(
+      "IDENTIDADE_NAO_VERIFICADA",
+      403,
+      "Confirme seu e-mail.",
+    );
+  const db = criarClienteAdmin();
+  const { data, error } = await db.rpc("responder_convite", {
+    p_usuario: user.id,
+    p_sessao: user.sessao_id,
+    p_convite: id,
+    p_status: status,
+  });
+  falhaBanco(error);
+  await processarNotificacoes(id);
+  return { convite: semSegredos(data!), ...(await estadosEnvio(id)) };
+}
 export async function recuperarEmail(
   id: number,
   tipo: "convite" | "confirmacao",
