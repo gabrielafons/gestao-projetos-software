@@ -24,16 +24,19 @@ import {
 import { obterEvento } from "./eventos";
 import { falhaBanco, FalhaOperacao } from "./erros";
 import { criarToken, hashToken } from "./tokens";
-import { processarNotificacoes, estadoEnvio } from "./notificacoes";
+import { processarNotificacoes, diagnosticoEnvio } from "./notificacoes";
 async function estadosEnvio(id: number) {
-  const [convite_envio_status, confirmacao_envio_status] = await Promise.all([
-    estadoEnvio(id),
-    estadoEnvio(id, "confirmacao"),
+  const [convite, confirmacao] = await Promise.all([
+    diagnosticoEnvio(id),
+    diagnosticoEnvio(id, "confirmacao"),
   ]);
   return {
-    envio_status: convite_envio_status,
-    convite_envio_status,
-    confirmacao_envio_status,
+    envio_status: convite.estado,
+    envio_erro: convite.erro,
+    convite_envio_status: convite.estado,
+    convite_envio_erro: convite.erro,
+    confirmacao_envio_status: confirmacao.estado,
+    confirmacao_envio_erro: confirmacao.erro,
   };
 }
 async function temProva(
@@ -173,7 +176,7 @@ export async function emitirConvite(dados: DadosEmissaoConvite) {
   await processarNotificacoes(data.id);
   return {
     convite: semSegredos(data),
-    envio_status: await estadoEnvio(data.id),
+    ...(await estadosEnvio(data.id)),
   };
 }
 function semSegredos(c: Convite) {
@@ -257,9 +260,11 @@ export async function recuperarEmail(
   });
   falhaBanco(error);
   await processarNotificacoes(id);
+  const diagnostico = await diagnosticoEnvio(id, tipo);
   return {
     ...(await estadosEnvio(id)),
-    envio_status: await estadoEnvio(id, tipo),
+    envio_status: diagnostico.estado,
+    envio_erro: diagnostico.erro,
   };
 }
 export async function reenviarConvite(id: number) {

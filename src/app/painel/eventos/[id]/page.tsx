@@ -108,10 +108,17 @@ export default async function PaginaEvento({
                         ? nomesEnvio[convite.convite_envio_status]
                         : "Envio ainda não registrado"}
                     </p>
+                    {convite.convite_envio_status === "falhou" &&
+                      convite.convite_envio_erro && (
+                        <p className="text-sm text-red-700 dark:text-red-300">
+                          {convite.convite_envio_erro}
+                        </p>
+                      )}
                     {convite.status === "confirmado" && (
                       <ConfirmacaoEmail
                         id={convite.id}
                         estado={convite.confirmacao_envio_status}
+                        erro={convite.confirmacao_envio_erro}
                       />
                     )}
                   </div>

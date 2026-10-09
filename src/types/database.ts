@@ -38,6 +38,9 @@ export type Convite = {
 };
 export type ConviteLista = Omit<Convite, "token_hash" | "cpf" | "telefone"> & {
   envio_status: EstadoEnvio | null;
+  envio_erro: string | null;
+  convite_envio_erro: string | null;
+  confirmacao_envio_erro: string | null;
   convite_envio_status: EstadoEnvio | null;
   confirmacao_envio_status: EstadoEnvio | null;
 };

@@ -1,22 +1,36 @@
 import "server-only";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
 import { enviarNotificacao } from "@/lib/email/enviar";
+import {
+  classificarFalhaEnvio,
+  mensagemEnvioSegura,
+} from "@/lib/email/falha-envio";
 import { falhaBanco } from "./erros";
-export async function estadoEnvio(
+export async function diagnosticoEnvio(
   conviteId: number,
   tipo: "convite" | "confirmacao" | "acesso" = "convite",
 ) {
   const db = criarClienteAdmin();
   const { data, error } = await db
     .from("notificacoes")
-    .select("estado")
+    .select("estado,ultimo_erro")
     .eq("convite_id", conviteId)
     .eq("tipo", tipo)
     .order("id", { ascending: false })
     .limit(1)
     .maybeSingle();
   falhaBanco(error);
-  return data?.estado ?? null;
+  return {
+    estado: data?.estado ?? null,
+    erro:
+      data?.estado === "falhou" ? mensagemEnvioSegura(data.ultimo_erro) : null,
+  };
+}
+export async function estadoEnvio(
+  conviteId: number,
+  tipo: "convite" | "confirmacao" | "acesso" = "convite",
+) {
+  return (await diagnosticoEnvio(conviteId, tipo)).estado;
 }
 export async function processarNotificacoes(conviteId?: number) {
   const db = criarClienteAdmin();
@@ -42,13 +56,12 @@ export async function processarNotificacoes(conviteId?: number) {
         .eq("lease", notificacao.lease!);
       falhaBanco(save);
       resultados.push({ id: notificacao.id, estado: "enviado" });
-    } catch {
+    } catch (erro) {
       const { error: save } = await db
         .from("notificacoes")
         .update({
           estado: "falhou",
-          ultimo_erro:
-            "Não foi possível enviar o e-mail. Verifique a configuração e tente novamente.",
+          ultimo_erro: classificarFalhaEnvio(erro).message,
           lease: null,
           lease_ate: null,
           proxima_tentativa: new Date(
