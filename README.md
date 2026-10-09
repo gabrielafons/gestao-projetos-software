@@ -1,215 +1,105 @@
-# Evently - Gestão de Eventos Corporativos
+# Evently — Gestão de Eventos Corporativos
 
-# Integrantes:
-Gabriel Afonso dos Santos (Dev)<br>
-Giovane Contreras Oba (PO)<br>
-Gustavo Trovó Ramos de Souza (SM)<br>
-Igor de Araujo Borges (Dev)<br>
+Integrantes: Gabriel Afonso dos Santos (Dev), Giovane Contreras Oba (PO), Gustavo Trovó Ramos de Souza (SM) e Igor de Araujo Borges (Dev).
 
-# Descrição do Projeto: 
-O Evently é uma plataforma web para gestão de eventos corporativos realizados por convite, sem venda de ingressos. A empresa organizadora emite convites nominais e, no momento em que o convidado confirma presença, o sistema libera automaticamente uma trilha de material preparatório sobre os temas do evento, além de um guia com todas as informações operacionais. Essa trilha inclui uma aula preparatória, que aborda os temas que serão tratados no evento. Durante o evento o convidado terá acesso a um quiz relacionado ao que foi apresentado, e ao atingir nota mínima, garante o direito a um brinde. O brinde é entregue em algum balcão a partir da leitura do código de acesso único de cada participante. No dia, a entrada e a saída são registradas por leitura desse código, permitindo apurar presença efetiva. Desistências podem ser formalizadas e o convite transferido a um substituto, evitando vagas ociosas.
+Plataforma de eventos por convite, sem venda de ingressos. A Sprint 1 implementa cadastro de organizador, login/logout, eventos, convites nominais, acesso verificado por e-mail, cadastro de participante, confirmação/recusa e notificações recuperáveis. Material preparatório, guia, portaria, quiz, brindes e transferência pertencem às próximas sprints.
 
----
+O escopo dos 33 cards está em [plano-sprint-1.md](docs/plano-sprint-1.md). A evidência de implementação e os limites da homologação estão em [entrega-sprint-1.md](docs/entrega-sprint-1.md).
 
-# Como rodar o projeto
+## Rodar em ambiente isolado
 
-## Pré-requisitos
-
-- **Node.js 20+** (o projeto foi desenvolvido no Node 22)
-- Uma conta no [Supabase](https://supabase.com) com um projeto criado
-
-## 1. Instalar as dependências
+Pré-requisitos: Node 22+, Docker e Supabase CLI 2.78.1. O projeto local é `evently-sprint1`; API 55431, Postgres 55432, Mailpit 55434, aplicação 3100. Os testes de integração/E2E rejeitam URLs Supabase fora desse ambiente.
 
 ```bash
-npm install
+npm ci
+supabase start -x realtime,storage-api,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+node scripts/configurar-local.mjs
+npm run dev -- -p 3100
 ```
 
-## 2. Configurar as variáveis de ambiente
+O configurador cria `.env.local` com as chaves locais e um segredo de worker, sem imprimi-los. Se o arquivo já existe, preserva a configuração e interrompe. Abra [Evently local](http://localhost:3100) e [caixa de e-mails de teste](http://127.0.0.1:55434). Use apenas destinatários sintéticos no ambiente local.
+
+Para aplicar migrations novas, use `supabase migration up --local`. Para reproduzir o schema do zero, `supabase db reset --local --no-seed` **apaga os dados do projeto local**; execute somente no ambiente de testes dedicado, com as suítes paradas. As migrations antigas permanecem preservadas; as novas são aditivas/corretivas.
+
+## Homologação externa
+
+Copie `.env.example` para `.env.local` ou configure as variáveis no servidor:
+
+| Variável | Uso |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Projeto correto e chave pública, submetida a RLS |
+| `SUPABASE_SERVICE_ROLE_KEY` | Apenas servidor; nunca no navegador/Git |
+| `APP_URL` | Origem HTTPS absoluta da aplicação, sem caminho |
+| `EMAIL_TRANSPORT=resend` | Entrega externa |
+| `RESEND_API_KEY` / `EMAIL_FROM` | Credencial e remetente (padrão de testes: onboarding@resend.dev) |
+| `NOTIFICATION_WORKER_TOKEN` | Segredo aleatório de pelo menos 32 caracteres |
+
+Antes de aplicar no remoto, confirme identidade do projeto e histórico de migrations. Aplique apenas migrations pendentes; não repare nem reescreva histórico desconhecido. Configure Site URL e URLs permitidas do Auth para o endereço real da aplicação. Nunca use `ALLOW_LOCAL_EMAIL` em homologação externa/produção.
+
+Com `onboarding@resend.dev`, o Resend entrega apenas ao e-mail da própria conta e aos simuladores oficiais; outros convidados exigem domínio verificado. O destinatário controlado deve comprovar recebimento real de convite, acesso e confirmação. Estado `enviado` significa aceitação pelo transporte/provedor; não comprova chegada à caixa externa. A entrega local usa Mailpit e não consome Resend.
+
+## Roteiro da Sprint 1
+
+1. Crie organizador em `/cadastro/organizador`; entre no painel.
+2. Crie um evento futuro com nome, data, horário e local. Datas usam `America/Sao_Paulo`.
+3. Emita convite com nome, e-mail, CPF e telefone. A pessoa é única por evento/e-mail.
+4. Na caixa de teste, abra o convite. O GET mostra apenas evento/e-mail mascarado e não cria identidade, perfil ou presença.
+5. Solicite o acesso postal e abra o segundo e-mail. Clique explicitamente para verificar seu e-mail.
+6. Revise os dados, conclua cadastro e abra `/meus-convites`.
+7. Confirme ou recuse. O status persiste; confirmação gera uma notificação única e aparece também ao organizador.
+8. Confira logout, validade e falhas recuperáveis de e-mail. O organizador pode recuperar convite/confirmacão; o participante com prova postal pode recuperar sua confirmação.
+
+Senha abre a área do organizador. A área do convidado exige prova postal por sessão e convite; ser organizador com e-mail declarado/auto-confirmado não constitui essa prova. Uma nova sessão por senha não herda dados do participante. Ao verificar um segundo convite no mesmo navegador/usuário, provas anteriores daquela sessão são preservadas, incluindo histórico expirado. Não há cópia global de provas por usuário.
+
+## E-mail e recuperação
+
+Convite e notificação são inseridos na mesma transação. Confirmação e notificação seguem a mesma regra. Falha de transporte não desfaz convite ou presença. A fila `notificacoes` contém estado separado (`pendente`, `processando`, `enviado`, `falhou`), tentativa, lease de cinco minutos, chave de idempotência e ID do provedor. Os templates têm HTML/texto e não incluem CPF/telefone.
+
+O request tenta o envio imediatamente. Pendências também precisam de um **agendador externo** no ambiente de deploy: chamar o processador a cada minuto e monitorar falhas. O script abaixo executa uma rodada; não instala nem agenda um cron por si só:
 
 ```bash
-cp .env.example .env.local
+npm run email:worker
 ```
 
-Preencha `.env.local` com as chaves do seu projeto Supabase
-(painel do Supabase → *Project Settings* → *API*):
+Ele chama `POST /api/notificacoes/processar` com `Authorization: Bearer <segredo>`, sem imprimir o segredo. O servidor precisa permitir até 120 segundos (cinco mensagens por rodada; cada chamada de transporte tem timeout de 15 segundos). Um scheduler pode chamar o endpoint diretamente com o mesmo header secreto. Rotas de recuperação respeitam ownership/prova postal e reutilizam a notificação e sua chave, inclusive após dez tentativas. Mensagens já enviadas não são reenviadas por esse mecanismo. O botão só aparece em estados recuperáveis.
 
-| Variável | Onde encontrar |
-|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | *Project URL* |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | chave `anon` / `public` |
-| `SUPABASE_SERVICE_ROLE_KEY` | chave `service_role` — **nunca** versionar |
+Resend usa chave estável de idempotência; a garantia do provedor tem uma janela limitada. Não há promessa de exatamente uma entrega externa em falhas indeterminadas além dessa janela. Não apagar o outbox para repetir envios; preserve o ID do provedor para investigação.
 
-## 3. Aplicar as migrations do banco
-
-As migrations ficam em `supabase/migrations/`, numeradas na ordem de execução.
-Aplique pelo **SQL Editor** do painel do Supabase (copiando o conteúdo de cada
-arquivo, na ordem) ou, com a [CLI do Supabase](https://supabase.com/docs/guides/cli)
-instalada e o projeto vinculado:
+## Checks reproduzíveis
 
 ```bash
-supabase db push
+npm test
+npm run test:integration
+npx playwright install chromium
+npm run test:e2e
+npm run typecheck
+npm run lint
+npm run build
+npm audit --omit=dev
 ```
 
-## 4. Subir a aplicação
+Rode integração e E2E **em sequência**, pois usam fixtures de CPF e o mesmo banco dedicado. E2E usa Auth/Postgres/Mailpit reais, abre links extraídos do e-mail capturado e interrompe/reinicia apenas `supabase_inbucket_evently-sprint1` para provar falha/recuperação. Não execute junto de uma demonstração. Os usuários criados pelas suítes são removidos depois; relatórios e traces ficam ignorados em `playwright-report/` e `test-results/` e podem conter tokens sintéticos.
 
-```bash
-npm run dev
-```
+## Arquitetura e acesso
 
-A aplicação sobe em <http://localhost:3000>.
-O cadastro de organizador fica em `/cadastro/organizador`.
+Next.js 16.4.0, React 19.2.8, TypeScript, Zod, Supabase Auth/Postgres/RLS, Resend e React Email. `src/proxy.ts` renova sessão e preserva cookies nos redirects; guards de serviço, RPCs restritas e RLS autorizam cada operação. Links internos de retorno são sanitizados. Permissões de organizador/convidado vêm dos vínculos no banco, nunca de `user_metadata` editável. Operador usa metadado administrado pelo servidor e tem apenas destino protegido nesta sprint.
 
-## Scripts disponíveis
+- `src/app`: páginas e endpoints HTTP.
+- `src/components`: formulários, estado, navegação e detalhes.
+- `src/lib/services`: autorização e regras de negócio.
+- `src/lib/validators`: contratos compartilhados UI/API.
+- `src/lib/email` / `src/emails`: transporte e templates.
+- `supabase/migrations`: schema, integridade, RLS e transações restritas.
+- `tests/integration` / `tests/e2e`: verificação integrada isolada.
 
-| Comando | O que faz |
-|---|---|
-| `npm run dev` | ambiente de desenvolvimento |
-| `npm run build` | build de produção |
-| `npm start` | executa o build de produção |
-| `npm test` | roda a suíte de testes |
-| `npm run typecheck` | checagem de tipos (`tsc --noEmit`) |
-| `npm run lint` | ESLint |
+Funções transacionais existem apenas para fronteiras de integridade (convite/outbox, perfil/vínculo, resposta/outbox, claim e prova postal). APIs RPC privilegiadas são exclusivas de `service_role`; tabelas de notificações/provas/limites não ficam acessíveis ao browser. Tokens de convite são aleatórios de 32 bytes, armazenados como hash; código de participante não é credencial de acesso. Convite encaminhado não substitui prova de caixa postal. Dados pessoais não entram no e-mail/página pública nem no log de erros.
 
----
+Mutations verificam a origem e usam limite persistente por IP/convite. Em deploy, o proxy de entrada deve definir/remover `X-Forwarded-For` de forma confiável; não exponha a porta Node diretamente permitindo IP arbitrário fornecido pelo cliente.
 
-# Arquitetura
+## Rollback
 
-## Tecnologias
+Reverta commits de aplicação e desative o worker/novos fluxos. Preserve schema, participantes, respostas, histórico de provas e notificações; use migration corretiva para problemas no banco. Reverter código não reverte e-mails enviados. Nunca excluir perfis/convites para desfazer deploy. O release exige migrations e variáveis disponíveis antes de habilitar rotas.
 
-As escolhas seguem a análise de reuso registrada na
-[Wiki do projeto](https://github.com/gabrielafons/top-adv-eng-soft/wiki/Oportunidades-de-Reuso):
+O ambiente desta entrega usa `.env.local` com Resend e remetente padrão, conforme solicitado. A cópia `.env.test.local` preserva o transporte Mailpit para testes isolados. Ao repetir E2E, pare o servidor Resend, use a configuração local de testes e suba o servidor com `EMAIL_TRANSPORT=local` (ambos usam o mesmo banco dedicado). O arquivo de teste também é privado e ignorado pelo Git.
 
-| Camada | Tecnologia | Papel |
-|---|---|---|
-| Aplicação | **Next.js (React + TypeScript)** sobre Node.js | interface web e API do sistema |
-| Autenticação | **Supabase Auth** | credenciais e controle de acesso por perfil |
-| Banco de dados | **Postgres** (Supabase) | persistência, com RLS por usuário |
-| Validação | **Zod** | regras compartilhadas entre UI e API |
-
-Previstos para as próximas sprints: **Resend + React Email** (convites),
-**qrcode** e **@zxing/library** (check-in por QR Code).
-
-## Organização do código
-
-A lógica de negócio fica **no código da aplicação** — não em Edge Functions nem
-em triggers de banco. As responsabilidades são separadas em camadas:
-
-```
-src/
-├── app/
-│   ├── api/organizadores/route.ts   endpoint de cadastro (HTTP apenas)
-│   ├── api/sessao/route.ts          login e logout
-│   ├── cadastro/organizador/        formulário de cadastro
-│   ├── login/                       tela de login
-│   ├── painel/                      área do organizador (exige sessão)
-│   └── page.tsx                     home
-├── components/                      componentes de UI reutilizáveis
-├── lib/
-│   ├── env.ts                       leitura validada das variáveis de ambiente
-│   ├── perfis.ts                    perfis de acesso e rota inicial de cada um
-│   ├── services/                    regra de negócio (não conhece HTTP)
-│   ├── supabase/                    clientes: navegador, servidor e admin
-│   └── validators/                  schemas de validação + testes
-├── middleware.ts                    renova a sessão e protege as rotas
-└── types/database.ts                tipos que espelham o schema
-
-supabase/migrations/                 schema versionado, uma migration por tarefa
-```
-
-O fluxo de uma requisição de cadastro:
-
-```
-formulário  →  validators  →  route handler  →  service  →  Supabase
-  (UI)         (Zod)           (HTTP)          (negócio)   (Auth + Postgres)
-```
-
-O **mesmo** schema Zod valida na tela e no servidor, então a mensagem que o
-usuário vê nunca diverge da regra aplicada de fato.
-
-## Modelo de dados
-
-| Tabela | História | Conteúdo |
-|---|---|---|
-| `organizadores` | UH 01 | perfil do organizador (1:1 com `auth.users`) |
-| `convidados` | UH 02 | perfil do convidado (1:1 com `auth.users`) |
-| `eventos` | UH 03 | evento criado por um organizador |
-| `convites` | UH 05 | convite nominal, com código único de acesso |
-
-Decisões aplicadas em todas as tabelas:
-
-- **Senhas não são armazenadas nas tabelas de perfil.** Ficam sob a guarda do
-  Supabase Auth, em `auth.users`.
-- **RLS habilitado** em todas: cada usuário só alcança os próprios dados, e a
-  regra é garantida pelo banco — não pela aplicação.
-- **Toda chave estrangeira tem índice**, já que o Postgres não os cria sozinho.
-- CPF, e-mail e código de convite têm restrição de unicidade.
-
-## Endpoints
-
-### `POST /api/organizadores`
-
-Cadastra um organizador (UH 01 — T2).
-
-```json
-{
-  "nome": "Giovane Contreras Oba",
-  "email": "giovane@exemplo.com",
-  "cpf": "52998224725",
-  "telefone": "11987654321",
-  "senha": "Evently@2026"
-}
-```
-
-Regras aplicadas (as mesmas na tela e no servidor):
-
-| Campo | Regra |
-|---|---|
-| `nome` | nome e sobrenome, até 50 caracteres, apenas letras |
-| `email` | formato válido, até 254 caracteres (RFC 5321) |
-| `cpf` | 11 dígitos, conferidos pelos dígitos verificadores |
-| `telefone` | DDD válido + 8 ou 9 dígitos |
-| `senha` | 8 caracteres ou mais, com maiúscula, minúscula, número e símbolo |
-
-| Status | Situação |
-|---|---|
-| `201` | cadastro realizado |
-| `400` | dados obrigatórios ausentes ou inválidos (retorna `erros` por campo) |
-| `409` | e-mail ou CPF já cadastrado |
-| `500` | falha inesperada |
-
-### `POST /api/sessao`
-
-Abre a sessão (UH 04 — T2/T5). Retorna o perfil e a rota inicial dele.
-
-```json
-{ "email": "giovane@exemplo.com", "senha": "Evently@2026" }
-```
-
-| Status | Situação |
-|---|---|
-| `200` | sessão aberta |
-| `400` | e-mail ou senha não informados |
-| `401` | e-mail ou senha incorretos |
-| `403` | conta sem perfil definido |
-
-### `DELETE /api/sessao`
-
-Encerra a sessão. Responde `204`.
-
----
-
-# Controle de acesso
-
-O perfil (`organizador`, `convidado` ou `operador`) é gravado nos metadados do
-usuário no Supabase Auth durante o cadastro, e decide o que cada pessoa alcança:
-
-| Perfil | Destino ao entrar |
-|---|---|
-| organizador | `/painel` |
-| convidado | `/meus-convites` |
-| operador | `/operacao` |
-
-A proteção acontece em duas camadas: o `middleware.ts` barra quem não tem
-sessão antes da página carregar, e cada página protegida confere o perfil —
-para que um convidado autenticado não alcance a área do organizador apenas
-digitando a URL.
+O smoke remoto é explícito: `node --env-file=.env.local tests/manual/resend.mjs`. Envia três mensagens somente para `delivered+...@resend.dev`, exercita a API da aplicação e apaga seus usuários locais ao concluir. Não faz parte de `npm test`.

@@ -7,25 +7,35 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx --test src/**/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "test": "node scripts/testes-unitarios.mjs",
+    "typecheck": "tsc --noEmit",
+    "test:integration": "tsx --env-file=.env.local --test tests/integration/*.test.ts",
+    "test:e2e": "playwright test",
+    "email:worker": "tsx --env-file=.env.local scripts/processar-notificacoes.ts"
   },
   "dependencies": {
-    "@supabase/ssr": "^0.12.7",
-    "@supabase/supabase-js": "^2.116.0",
-    "next": "16.3.4",
+    "@react-email/components": "1.0.12",
+    "@react-email/render": "2.1.0",
+    "@supabase/ssr": "0.12.7",
+    "@supabase/supabase-js": "2.116.0",
+    "next": "16.4.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "server-only": "^0.0.1",
-    "zod": "^4.6.2"
+    "resend": "6.32.1",
+    "server-only": "0.0.1",
+    "zod": "4.6.2"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.3.4",
+    "eslint-config-next": "16.4.0",
+    "pg": "8.23.1",
+    "prettier": "3.9.9",
     "tailwindcss": "^4",
     "tsx": "^4.23.13",
     "typescript": "^5"
