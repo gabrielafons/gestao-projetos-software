@@ -463,6 +463,61 @@ export function BotaoReenviarConvite({
   );
 }
 
+export function ResponderConvite({ id }: { id: number }) {
+  const envio = useEnvio();
+  const router = useRouter();
+  const [respondido, setRespondido] = useState(false);
+  async function responder(status: "confirmado" | "recusado") {
+    const validacao = schemaRespostaConvite.safeParse({ status });
+    if (!validacao.success) return;
+    const corpo = await envio.enviar(
+      `/api/convites/${id}`,
+      validacao.data,
+      "PATCH",
+    );
+    if (corpo) {
+      setRespondido(true);
+      envio.setSucesso(
+        status === "confirmado"
+          ? corpo.confirmacao_envio_status === "enviado"
+            ? "Sua presença foi confirmada e o e-mail de confirmação foi enviado."
+            : "Sua presença foi confirmada. O e-mail de confirmação está pendente; acompanhe o envio abaixo."
+          : "Sua recusa foi registrada.",
+      );
+    }
+    router.refresh();
+  }
+  return (
+    <div className="space-y-4" aria-busy={envio.enviando}>
+      <p className="text-sm text-neutral-600 dark:text-neutral-400">
+        Escolha sua resposta. Depois de registrada, ela não poderá ser alterada
+        por aqui.
+      </p>
+      {envio.avisos}
+      {!respondido && (
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            disabled={envio.enviando}
+            onClick={() => responder("confirmado")}
+            className={classeBotao}
+          >
+            {envio.enviando ? "Registrando resposta…" : "Confirmar presença"}
+          </button>
+          <button
+            type="button"
+            disabled={envio.enviando}
+            onClick={() => responder("recusado")}
+            className="rounded-lg border border-neutral-300 px-4 py-2.5 text-sm font-medium hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60 dark:border-neutral-700 dark:hover:bg-neutral-800"
+          >
+            Recusar convite
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ConfirmarAcesso({
   tokenHash,
   convite,
