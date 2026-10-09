@@ -1,3 +1,5 @@
+import { executarHttp } from "@/lib/http";
+import { limitarSolicitacao } from "@/lib/services/limites";
 import { NextResponse } from "next/server";
 
 import { ROTA_INICIAL } from "@/lib/perfis";
@@ -17,7 +19,7 @@ const STATUS_POR_FALHA: Record<FalhaLogin, number> = {
   ERRO_INTERNO: 500,
 };
 
-export async function POST(request: Request) {
+async function postInterno(request: Request) {
   let corpo: unknown;
 
   try {
@@ -56,7 +58,17 @@ export async function POST(request: Request) {
   });
 }
 
-export async function DELETE() {
-  await sair();
-  return new NextResponse(null, { status: 204 });
+export async function DELETE(request: Request) {
+  return executarHttp(async () => {
+    await limitarSolicitacao(request, "logout", 30);
+    await sair();
+    return new NextResponse(null, { status: 204 });
+  });
+}
+
+export async function POST(request: Request) {
+  return executarHttp(async () => {
+    await limitarSolicitacao(request, "login", 20);
+    return postInterno(request);
+  });
 }

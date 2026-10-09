@@ -47,7 +47,7 @@ function FormularioLogin() {
       const corpo = await resposta.json();
 
       if (!resposta.ok) {
-        setErroGeral(corpo?.mensagem ?? "Nao foi possivel entrar.");
+        setErroGeral(corpo?.mensagem ?? "Não foi possível entrar.");
         return;
       }
 
@@ -58,7 +58,7 @@ function FormularioLogin() {
       router.refresh();
     } catch {
       setErroGeral(
-        "Falha de conexao com o servidor. Verifique sua internet e tente novamente.",
+        "Falha de conexão com o servidor. Verifique sua internet e tente novamente.",
       );
     } finally {
       setEntrando(false);
@@ -129,7 +129,7 @@ export default function PaginaLogin() {
         </Suspense>
 
         <p className="mt-6 text-sm text-neutral-600 dark:text-neutral-400">
-          Ainda nao tem conta?{" "}
+          Ainda não tem conta?{" "}
           <Link
             href="/cadastro/organizador"
             className="font-medium text-indigo-600 hover:underline dark:text-indigo-400"

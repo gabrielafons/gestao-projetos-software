@@ -1,89 +1,141 @@
 import "server-only";
-
+import type { User } from "@supabase/supabase-js";
 import { lerPerfil, type Perfil } from "@/lib/perfis";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { DadosLogin } from "@/lib/validators/login";
-
-/** UH 04 - Regra de negocio da sessao do usuario. */
-
-export type FalhaLogin = "CREDENCIAIS_INVALIDAS" | "PERFIL_AUSENTE" | "ERRO_INTERNO";
-
+import { FalhaOperacao, falhaBanco } from "./erros";
+export type FalhaLogin =
+  "CREDENCIAIS_INVALIDAS" | "PERFIL_AUSENTE" | "ERRO_INTERNO";
 export type ResultadoLogin =
   | { sucesso: true; perfil: Perfil }
   | { sucesso: false; falha: FalhaLogin; mensagem: string };
-
-/**
- * Abre a sessao do usuario.
- *
- * Usa o cliente de servidor porque e ele que grava a sessao nos cookies; com o
- * cliente de navegador o token ficaria so na memoria da aba e o servidor nao
- * reconheceria quem esta autenticado.
- */
+// Only getClaims' verified result is authority for the current Auth session.
+export async function sessaoVerificada(
+  usuarioId: string,
+  accessToken?: string,
+  cliente?: Awaited<ReturnType<typeof criarClienteServidor>>,
+) {
+  const db = cliente ?? (await criarClienteServidor());
+  const { data, error } = await db.auth.getClaims(accessToken);
+  const sessao = data?.claims.session_id;
+  if (
+    error ||
+    data?.claims.sub !== usuarioId ||
+    typeof sessao !== "string" ||
+    !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(
+      sessao,
+    )
+  ) {
+    throw new FalhaOperacao(
+      "SESSAO_AUSENTE",
+      401,
+      "Entre novamente para continuar.",
+    );
+  }
+  return sessao;
+}
+async function usuarioComPerfis(user: User) {
+  const db = await criarClienteServidor();
+  const [organizador, convidado] = await Promise.all([
+    db.from("organizadores").select("nome").eq("id", user.id).maybeSingle(),
+    db.from("convidados").select("nome").eq("id", user.id).maybeSingle(),
+  ]);
+  falhaBanco(organizador.error);
+  falhaBanco(convidado.error);
+  const sessao_id = await sessaoVerificada(user.id);
+  const perfis: Perfil[] = [];
+  if (organizador.data) perfis.push("organizador");
+  if (convidado.data) perfis.push("convidado");
+  if (lerPerfil(user.app_metadata) === "operador") perfis.push("operador");
+  return {
+    id: user.id,
+    sessao_id,
+    email: user.email ?? "",
+    nome: organizador.data?.nome ?? convidado.data?.nome ?? "",
+    perfil: perfis[0] ?? null,
+    perfis,
+    email_verificado: !!user.email_confirmed_at,
+  };
+}
 export async function entrar(dados: DadosLogin): Promise<ResultadoLogin> {
-  const supabase = await criarClienteServidor();
-
-  const { data, error } = await supabase.auth.signInWithPassword({
+  const db = await criarClienteServidor();
+  const { data, error } = await db.auth.signInWithPassword({
     email: dados.email,
     password: dados.senha,
   });
-
-  if (error || !data.user) {
-    // E-mail inexistente e senha errada devolvem a mesma resposta de proposito:
-    // distinguir os dois casos revelaria quais e-mails tem conta na plataforma.
-    if (error?.code === "invalid_credentials") {
-      return {
-        sucesso: false,
-        falha: "CREDENCIAIS_INVALIDAS",
-        mensagem: "E-mail ou senha incorretos.",
-      };
-    }
-
-    console.error("[entrar] falha ao autenticar", error);
+  if (error || !data.user)
     return {
       sucesso: false,
-      falha: "ERRO_INTERNO",
-      mensagem: "Nao foi possivel entrar. Tente novamente.",
+      falha:
+        error?.code === "invalid_credentials"
+          ? "CREDENCIAIS_INVALIDAS"
+          : "ERRO_INTERNO",
+      mensagem:
+        error?.code === "invalid_credentials"
+          ? "E-mail ou senha incorretos."
+          : "Não foi possível entrar. Tente novamente.",
     };
-  }
-
-  const perfil = lerPerfil(data.user.user_metadata);
-
-  if (!perfil) {
-    // Conta sem perfil nao tem para onde ir: encerra a sessao recem-aberta.
-    await supabase.auth.signOut();
-
+  const usuario = await usuarioComPerfis(data.user);
+  if (!usuario.perfil) {
+    await db.auth.signOut();
     return {
       sucesso: false,
       falha: "PERFIL_AUSENTE",
       mensagem:
-        "Sua conta esta sem perfil definido. Procure o organizador do evento.",
+        "Para acessar seus convites, abra o convite recebido e solicite um novo link de acesso por e-mail.",
     };
   }
-
-  return { sucesso: true, perfil };
+  return { sucesso: true, perfil: usuario.perfil };
 }
-
-export async function sair(): Promise<void> {
-  const supabase = await criarClienteServidor();
-  await supabase.auth.signOut();
+export async function sair() {
+  const db = await criarClienteServidor();
+  const { error } = await db.auth.signOut();
+  if (error)
+    throw new FalhaOperacao(
+      "ERRO_INTERNO",
+      503,
+      "Não foi possível encerrar a sessão. Tente novamente.",
+    );
 }
-
-/** Usuario da sessao atual, ou `null`. Usado pelas telas protegidas. */
 export async function usuarioAtual() {
-  const supabase = await criarClienteServidor();
-
-  // `getUser` revalida o token no servidor. `getSession` apenas le o cookie,
-  // que pode ter sido adulterado no navegador.
+  const db = await criarClienteServidor();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return null;
-
-  return {
-    id: user.id,
-    email: user.email ?? "",
-    nome: (user.user_metadata?.nome as string | undefined) ?? "",
-    perfil: lerPerfil(user.user_metadata),
-  };
+    error,
+  } = await db.auth.getUser();
+  if (!user) {
+    if (
+      error &&
+      error.name !== "AuthSessionMissingError" &&
+      error.status !== 401 &&
+      error.status !== 403
+    )
+      throw new FalhaOperacao(
+        "AUTH_INDISPONIVEL",
+        503,
+        "Não foi possível verificar sua sessão.",
+      );
+    return null;
+  }
+  return usuarioComPerfis(user);
+}
+export async function exigirUsuario() {
+  const user = await usuarioAtual();
+  if (!user)
+    throw new FalhaOperacao(
+      "SESSAO_AUSENTE",
+      401,
+      "Entre na plataforma para continuar.",
+    );
+  return user;
+}
+export async function exigirOrganizador() {
+  const user = await exigirUsuario();
+  if (!user.perfis.includes("organizador"))
+    throw new FalhaOperacao(
+      "SEM_PERMISSAO",
+      403,
+      "Esta ação é exclusiva do organizador.",
+    );
+  return user;
 }

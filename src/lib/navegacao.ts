@@ -6,7 +6,10 @@
  * fora do Evently logo apos ela digitar a senha, com o link parecendo nosso.
  * Por isso so passam caminhos relativos deste mesmo site.
  */
-export function destinoSeguro(valor: string | null, alternativa: string): string {
+export function destinoSeguro(
+  valor: string | null,
+  alternativa: string,
+): string {
   if (!valor) return alternativa;
 
   // Precisa ser um caminho absoluto dentro do site.
@@ -15,5 +18,13 @@ export function destinoSeguro(valor: string | null, alternativa: string): string
   // "//host" e "/\host" sao lidos por navegadores como endereco externo.
   if (valor.startsWith("//") || valor.startsWith("/\\")) return alternativa;
 
-  return valor;
+  try {
+    const base = "https://evently.invalid";
+    const destino = new URL(valor, base);
+    if (destino.origin !== base || /[\\\u0000-\u001f]/.test(valor))
+      return alternativa;
+    return destino.pathname + destino.search + destino.hash;
+  } catch {
+    return alternativa;
+  }
 }

@@ -8,9 +8,7 @@ import type { Organizador } from "@/types/database";
 
 /** Codigos estaveis de falha, para a camada HTTP mapear em status. */
 export type FalhaCadastro =
-  | "EMAIL_JA_CADASTRADO"
-  | "CPF_JA_CADASTRADO"
-  | "ERRO_INTERNO";
+  "EMAIL_JA_CADASTRADO" | "CPF_JA_CADASTRADO" | "ERRO_INTERNO";
 
 export type ResultadoCadastro =
   | { sucesso: true; organizador: Organizador }
@@ -29,9 +27,8 @@ const VIOLACAO_DE_UNICIDADE = "23505";
  */
 export async function cadastrarOrganizador(
   dados: DadosCadastroOrganizador,
+  supabase = criarClienteAdmin(),
 ): Promise<ResultadoCadastro> {
-  const supabase = criarClienteAdmin();
-
   // 1. Credencial no Supabase Auth (a senha e armazenada e cifrada por ele).
   const { data: usuarioCriado, error: erroAuth } =
     await supabase.auth.admin.createUser({
@@ -39,7 +36,8 @@ export async function cadastrarOrganizador(
       password: dados.senha,
       email_confirm: true,
       // O perfil vai nos metadados para servir de controle de acesso (UH 04 - T3).
-      user_metadata: { perfil: "organizador", nome: dados.nome },
+      app_metadata: { perfil: "organizador" },
+      user_metadata: { nome: dados.nome },
     });
 
   if (erroAuth || !usuarioCriado?.user) {
@@ -51,7 +49,9 @@ export async function cadastrarOrganizador(
       };
     }
 
-    console.error("[cadastrarOrganizador] falha ao criar usuario", erroAuth);
+    console.error("[cadastrarOrganizador] falha ao criar usuário", {
+      codigo: erroAuth?.code,
+    });
     return {
       sucesso: false,
       falha: "ERRO_INTERNO",
@@ -76,7 +76,20 @@ export async function cadastrarOrganizador(
 
   if (erroPerfil || !organizador) {
     // Desfaz o passo 1 para nao deixar credencial sem perfil.
-    await supabase.auth.admin.deleteUser(usuarioId);
+    const { error: erroCompensacao } =
+      await supabase.auth.admin.deleteUser(usuarioId);
+    if (erroCompensacao) {
+      console.error("[cadastrarOrganizador] compensação pendente", {
+        usuarioId,
+        codigo: erroCompensacao.code,
+      });
+      return {
+        sucesso: false,
+        falha: "ERRO_INTERNO",
+        mensagem:
+          "Não foi possível concluir o cadastro. Procure o suporte antes de tentar novamente.",
+      };
+    }
 
     if (erroPerfil?.code === VIOLACAO_DE_UNICIDADE) {
       const violou = (alvo: string) =>
@@ -97,7 +110,9 @@ export async function cadastrarOrganizador(
       };
     }
 
-    console.error("[cadastrarOrganizador] falha ao gravar perfil", erroPerfil);
+    console.error("[cadastrarOrganizador] falha ao gravar perfil", {
+      codigo: erroPerfil?.code,
+    });
     return {
       sucesso: false,
       falha: "ERRO_INTERNO",

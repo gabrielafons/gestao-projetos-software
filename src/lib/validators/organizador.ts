@@ -6,10 +6,7 @@ import {
   nomeCompletoEhValido,
   TAMANHO_MAXIMO_NOME,
 } from "@/lib/validators/nome";
-import {
-  REQUISITOS_SENHA,
-  TAMANHO_MAXIMO_SENHA,
-} from "@/lib/validators/senha";
+import { REQUISITOS_SENHA, TAMANHO_MAXIMO_SENHA } from "@/lib/validators/senha";
 import {
   normalizarTelefone,
   telefoneEhValido,

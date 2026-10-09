@@ -40,7 +40,9 @@ export default function PaginaCadastroOrganizador() {
   const router = useRouter();
   const [campos, setCampos] = useState<Campos>(VALORES_INICIAIS);
   const [erros, setErros] = useState<ErrosPorCampo>({});
-  const [tocados, setTocados] = useState<Partial<Record<NomeCampo, boolean>>>({});
+  const [tocados, setTocados] = useState<Partial<Record<NomeCampo, boolean>>>(
+    {},
+  );
   const [erroGeral, setErroGeral] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [concluido, setConcluido] = useState(false);
@@ -82,7 +84,9 @@ export default function PaginaCadastroOrganizador() {
     const validacao = schemaCadastroOrganizador.safeParse(campos);
 
     if (!validacao.success) {
-      setErros(extrairErrosPorCampo(validacao.error));
+      const errosValidacao = extrairErrosPorCampo(validacao.error);
+      setErros(errosValidacao);
+      document.getElementById(Object.keys(errosValidacao)[0])?.focus();
       setTocados({
         nome: true,
         email: true,
@@ -94,6 +98,7 @@ export default function PaginaCadastroOrganizador() {
     }
 
     setEnviando(true);
+    let contaCriada = false;
 
     try {
       const resposta = await fetch("/api/organizadores", {
@@ -102,12 +107,16 @@ export default function PaginaCadastroOrganizador() {
         body: JSON.stringify(validacao.data),
       });
 
+      // HTTP de sucesso confirma a criação, mesmo se a próxima etapa falhar.
+      contaCriada = resposta.ok;
       const corpo = await resposta.json();
 
       if (!resposta.ok) {
         // O servidor tambem devolve erros por campo quando a validacao falha la.
         if (corpo?.erros) setErros(corpo.erros as ErrosPorCampo);
-        setErroGeral(corpo?.mensagem ?? "Nao foi possivel concluir o cadastro.");
+        setErroGeral(
+          corpo?.mensagem ?? "Não foi possível concluir o cadastro.",
+        );
         return;
       }
 
@@ -133,9 +142,13 @@ export default function PaginaCadastroOrganizador() {
       // A conta existe; so a sessao automatica falhou. Sobra entrar a mao.
       setConcluido(true);
     } catch {
-      setErroGeral(
-        "Falha de conexao com o servidor. Verifique sua internet e tente novamente.",
-      );
+      if (contaCriada) {
+        setConcluido(true);
+      } else {
+        setErroGeral(
+          "Não foi possível confirmar o cadastro. Verifique sua conexão e tente entrar antes de cadastrar novamente.",
+        );
+      }
     } finally {
       setEnviando(false);
     }
