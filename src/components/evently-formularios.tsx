@@ -265,6 +265,73 @@ function CamposPessoaFormulario({
   );
 }
 
+export function FormularioConvite({ eventoId }: { eventoId: number }) {
+  const router = useRouter();
+  const envio = useEnvio();
+  const [campos, setCampos] = useState<CamposPessoa>({
+    nome: "",
+    email: "",
+    cpf: "",
+    telefone: "",
+  });
+  async function aoEnviar(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const { nome, ...demais } = campos;
+    const validacao = schemaEmissaoConvite.safeParse({
+      ...demais,
+      nome_convidado: nome,
+      evento_id: eventoId,
+    });
+    if (!validacao.success) {
+      // A chave do contrato é nome_convidado; o campo visual usa nome.
+      envio.validar(validacao.error, "convite");
+      if (validacao.error.issues.some((i) => i.path[0] === "nome_convidado"))
+        document.getElementById("convite-nome")?.focus();
+      return;
+    }
+    const corpo = await envio.enviar("/api/convites", validacao.data);
+    if (!corpo) return;
+    setCampos({ nome: "", email: "", cpf: "", telefone: "" });
+    envio.setSucesso(
+      corpo.envio_status === "falhou"
+        ? "Convite criado. O e-mail não foi enviado; use Tentar envio novamente na lista abaixo."
+        : corpo.envio_status === "enviado"
+          ? "Convite criado e e-mail enviado."
+          : "Convite criado. O envio do e-mail está em andamento.",
+    );
+    router.refresh();
+  }
+  return (
+    <form
+      onSubmit={aoEnviar}
+      noValidate
+      className="space-y-5"
+      aria-busy={envio.enviando}
+    >
+      <fieldset disabled={envio.enviando}>
+        <legend className="sr-only">Dados do convidado</legend>
+        <CamposPessoaFormulario
+          prefixo="convite"
+          campos={campos}
+          erros={envio.erros}
+          mudar={(campo, valor) => {
+            setCampos((atual) => ({ ...atual, [campo]: valor }));
+            envio.setErros((atual) => ({
+              ...atual,
+              [campo]: "",
+              ...(campo === "nome" ? { nome_convidado: "" } : {}),
+            }));
+          }}
+        />
+      </fieldset>
+      {envio.avisos}
+      <button type="submit" disabled={envio.enviando} className={classeBotao}>
+        {envio.enviando ? "Emitindo convite…" : "Emitir e enviar convite"}
+      </button>
+    </form>
+  );
+}
+
 export function FormularioCadastroConvidado({
   token,
   iniciais,
