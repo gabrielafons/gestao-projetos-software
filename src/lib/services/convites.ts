@@ -49,6 +49,21 @@ async function temProva(
 }
 const CAMPOS =
   "id,evento_id,nome_convidado,email,status,codigo,convidado_id,expira_em,criado_em,updated_at" as const;
+export async function listarConvitesEvento(
+  eventoId: number,
+): Promise<ConviteLista[]> {
+  if (!(await obterEvento(eventoId))) return [];
+  const db = await criarClienteServidor();
+  const { data, error } = await db
+    .from("convites")
+    .select(CAMPOS)
+    .eq("evento_id", eventoId)
+    .order("id");
+  falhaBanco(error);
+  return Promise.all(
+    (data ?? []).map(async (c) => ({ ...c, ...(await estadosEnvio(c.id)) })),
+  );
+}
 export async function listarMeusConvites(): Promise<ConviteComEvento[]> {
   const user = await exigirUsuario();
   const db = await criarClienteServidor();
@@ -176,6 +191,29 @@ export async function cadastrarConvidado(dados: DadosConvidado) {
   });
   falhaBanco(error);
   return data;
+}
+export async function recuperarEmail(
+  id: number,
+  tipo: "convite" | "confirmacao",
+) {
+  const user =
+    tipo === "convite" ? await exigirOrganizador() : await exigirUsuario();
+  const admin = criarClienteAdmin();
+  const { error } = await admin.rpc("recuperar_notificacao", {
+    p_usuario: user.id,
+    p_sessao: user.sessao_id,
+    p_convite: id,
+    p_tipo: tipo,
+  });
+  falhaBanco(error);
+  await processarNotificacoes(id);
+  return {
+    ...(await estadosEnvio(id)),
+    envio_status: await estadoEnvio(id, tipo),
+  };
+}
+export async function reenviarConvite(id: number) {
+  return recuperarEmail(id, "convite");
 }
 export async function solicitarAcesso(token: string) {
   const registro = await convitePorToken(token);

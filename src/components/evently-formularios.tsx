@@ -424,6 +424,45 @@ export function BotaoSolicitarAcesso({ token }: { token: string }) {
   );
 }
 
+export function BotaoReenviarConvite({
+  id,
+  tipo = "convite",
+}: {
+  id: number;
+  tipo?: "convite" | "confirmacao";
+}) {
+  const envio = useEnvio();
+  const router = useRouter();
+  async function reenviar() {
+    const corpo = await envio.enviar(
+      `/api/convites/${id}/${tipo === "confirmacao" ? "confirmacao/" : ""}reenviar`,
+      {},
+    );
+    if (corpo?.envio_status === "falhou")
+      envio.setErro("O envio falhou. Tente novamente em alguns instantes.");
+    else if (corpo)
+      envio.setSucesso(
+        corpo.envio_status === "enviado"
+          ? "E-mail enviado."
+          : "O envio está pendente ou em andamento.",
+      );
+    router.refresh();
+  }
+  return (
+    <div className="space-y-3">
+      {envio.avisos}
+      <button
+        type="button"
+        disabled={envio.enviando}
+        onClick={reenviar}
+        className="rounded-lg border border-neutral-300 px-3 py-2 text-sm font-medium hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-60 dark:border-neutral-700 dark:hover:bg-neutral-800"
+      >
+        {envio.enviando ? "Tentando envio…" : "Tentar envio novamente"}
+      </button>
+    </div>
+  );
+}
+
 export function ConfirmarAcesso({
   tokenHash,
   convite,
