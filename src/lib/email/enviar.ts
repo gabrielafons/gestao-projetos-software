@@ -6,6 +6,7 @@ import { envEmail, envAplicacao } from "@/lib/env";
 import { Mensagem } from "@/emails/mensagem";
 import { EmailConvite } from "@/emails/convite";
 import { EmailConfirmacao } from "@/emails/confirmacao";
+import { classificarFalhaEnvio } from "./falha-envio";
 import type { Notificacao } from "@/types/database";
 export async function enviarNotificacao(n: Notificacao) {
   const origem = envAplicacao();
@@ -62,16 +63,20 @@ export async function enviarNotificacao(n: Notificacao) {
     const data = await response.json();
     return String(data.ID ?? data.id);
   }
-  const { data, error } = await new Resend(conf.apiKey).emails.send(
-    {
-      from: conf.remetente,
-      to: n.destinatario,
-      subject: `${titulo} — ${p.evento}`,
-      html,
-      text,
-    },
-    { idempotencyKey: n.chave, signal: AbortSignal.timeout(15000) },
-  );
-  if (error || !data?.id) throw new Error("ENVIO_INDISPONIVEL");
+  const { data, error } = await new Resend(conf.apiKey).emails
+    .send(
+      {
+        from: conf.remetente,
+        to: n.destinatario,
+        subject: `${titulo} — ${p.evento}`,
+        html,
+        text,
+      },
+      { idempotencyKey: n.chave, signal: AbortSignal.timeout(15000) },
+    )
+    .catch((erro: unknown) => {
+      throw classificarFalhaEnvio(erro);
+    });
+  if (error || !data?.id) throw classificarFalhaEnvio(error);
   return data.id;
 }

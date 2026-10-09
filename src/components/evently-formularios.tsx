@@ -20,6 +20,8 @@ type CorpoResposta = {
   evento?: { id: number };
   destino?: string;
   envio_status?: string;
+  envio_erro?: string | null;
+  confirmacao_envio_erro?: string | null;
   confirmacao_envio_status?: string | null;
 };
 
@@ -294,7 +296,7 @@ export function FormularioConvite({ eventoId }: { eventoId: number }) {
     setCampos({ nome: "", email: "", cpf: "", telefone: "" });
     envio.setSucesso(
       corpo.envio_status === "falhou"
-        ? "Convite criado. O e-mail não foi enviado; use Tentar envio novamente na lista abaixo."
+        ? `Convite criado. ${corpo.envio_erro ?? "O e-mail não foi enviado; use Tentar envio novamente na lista abaixo."}`
         : corpo.envio_status === "enviado"
           ? "Convite criado e e-mail enviado."
           : "Convite criado. O envio do e-mail está em andamento.",
@@ -439,7 +441,10 @@ export function BotaoReenviarConvite({
       {},
     );
     if (corpo?.envio_status === "falhou")
-      envio.setErro("O envio falhou. Tente novamente em alguns instantes.");
+      envio.setErro(
+        corpo.envio_erro ??
+          "O envio falhou. Tente novamente em alguns instantes.",
+      );
     else if (corpo)
       envio.setSucesso(
         corpo.envio_status === "enviado"
@@ -481,7 +486,7 @@ export function ResponderConvite({ id }: { id: number }) {
         status === "confirmado"
           ? corpo.confirmacao_envio_status === "enviado"
             ? "Sua presença foi confirmada e o e-mail de confirmação foi enviado."
-            : "Sua presença foi confirmada. O e-mail de confirmação está pendente; acompanhe o envio abaixo."
+            : `Sua presença foi confirmada. ${corpo.confirmacao_envio_erro ?? "O e-mail de confirmação está pendente; acompanhe o envio abaixo."}`
           : "Sua recusa foi registrada.",
       );
     }

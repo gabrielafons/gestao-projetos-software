@@ -48,6 +48,7 @@ export default async function PaginaMeuConvite({
           <ConfirmacaoEmail
             id={convite.id}
             estado={convite.confirmacao_envio_status}
+            erro={convite.confirmacao_envio_erro}
           />
         )}
         {expirado && (

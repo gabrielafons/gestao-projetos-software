@@ -10,9 +10,11 @@ const textos = {
 export function ConfirmacaoEmail({
   id,
   estado,
+  erro,
 }: {
   id: number;
   estado: EstadoEnvio | null;
+  erro?: string | null;
 }) {
   return (
     <div className="mt-4 space-y-3">
@@ -21,6 +23,9 @@ export function ConfirmacaoEmail({
           ? textos[estado]
           : "Envio do e-mail de confirmação ainda não registrado."}
       </p>
+      {estado === "falhou" && erro && (
+        <p className="text-sm text-red-700 dark:text-red-300">{erro}</p>
+      )}
       {(estado === "falhou" || estado === "pendente") && (
         <BotaoReenviarConvite id={id} tipo="confirmacao" />
       )}
