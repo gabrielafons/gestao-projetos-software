@@ -16,7 +16,7 @@ Evidência registrada em 2026-10-09, 23:30 UTC, na branch `feat/sprint-1-complet
 | Produção | `npm run build`: exit 0, 20 páginas geradas e APIs/páginas dinâmicas disponíveis |
 | Worker | `npm run email:worker`: processador autenticado executado, sem pendências/falhas no momento do check |
 | Dependências runtime | `npm audit --omit=dev`: zero vulnerabilidades; Next atualizado de 16.3.4 para 16.4.0 |
-| Revisão independente | Brecha postal, recuperação da confirmação e falso reenvio corrigidos; continuidade de dois convites revalidada por inspeção e E2E |
+| Revisão independente | Brecha postal, recuperação da confirmação e falso reenvio corrigidos; continuidade de dois convites revalidada por inspeção e E2E; [revisão final da branch](revisao-sprint-1.md) aprovada sem novos achados |
 
 O audit completo mantém cinco registros de severidade alta da mesma cadeia de ferramenta de lint (`braces`/`micromatch`/`fast-glob`/ESLint Next), sem correção compatível disponível; a sugestão automática era downgrade do Next ESLint. Não aplicado downgrade forçado. Nenhum está na árvore de dependências runtime. Referência: [advisory braces](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm).
 
